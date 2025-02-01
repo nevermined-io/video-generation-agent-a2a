@@ -45,7 +45,7 @@ interface MusicTrack {
  */
 export interface SongResponse {
   jobId: string;
-  musics: MusicTrack[];
+  music: MusicTrack;
 }
 
 /**

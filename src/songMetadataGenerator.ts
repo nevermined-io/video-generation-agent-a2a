@@ -5,9 +5,10 @@
 
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { RunnableSequence } from "@langchain/core/runnables";
+import { RunnableSequence, RunnableLambda } from "@langchain/core/runnables";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { Logger } from "./utils/logger";
+import { AIMessage } from "@langchain/core/messages";
 
 /**
  * Represents the complete song metadata structure
@@ -20,6 +21,56 @@ export interface SongMetadata {
   title: string;
   lyrics: string;
   tags: string[];
+}
+
+/**
+ * A custom Runnable to extract pure JSON from an LLM response (AIMessage), ignoring
+ * any text before or after the JSON block. This handles `content` that might be string or array.
+ */
+export const extractJsonRunnable = new RunnableLambda<AIMessage, string>({
+  /**
+   * The main function receiving `AIMessage`. We'll turn `content` (which may be array or string)
+   * into a single string, then run a regex to find the JSON block.
+   */
+  func: async (input: AIMessage): Promise<string> => {
+    const contentString = extractStringFromMessageContent(input.content);
+    const jsonMatch = contentString.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in the LLM response.");
+    }
+    return jsonMatch[0]; // The substring from the first '{' to the last '}'
+  },
+});
+
+/**
+ * Safely extract a string from an AIMessage content, which might be a string or an array.
+ *
+ * @param inputContent - The `AIMessage.content`, which can be string or array.
+ * @returns A single string that merges array elements or returns the original string.
+ */
+function extractStringFromMessageContent(inputContent: string | any[]): string {
+  if (typeof inputContent === "string") {
+    return inputContent;
+  }
+
+  if (Array.isArray(inputContent)) {
+    // Combine each array element into one single text block.
+    // You can customize how you join them (spaces, line breaks, etc.).
+    return inputContent
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        } else if (part && typeof part === "object") {
+          // Example: convert objects to JSON strings or do something else
+          return JSON.stringify(part);
+        }
+        return String(part);
+      })
+      .join("\n");
+  }
+
+  // Fallback if it's some other unexpected type
+  return String(inputContent);
 }
 
 /**
@@ -58,8 +109,9 @@ export class SongMetadataGenerator {
       Guidelines:  
       1. Title: Maximum 60 characters, no special punctuation.  
       2. Lyrics: Must be complete, including at least 3 verses + chorus (bridge, intro, and outros are optional but encouraged).  
-      3. Tags: Provide 3-5 descriptive keywords for genre, style, and mood.  
+      3. Tags: Provide 3-5 descriptive keywords for genre, style, and mood. For example, ["folk", "pop", "acoustic", "melancholic"].
       4. Output strictly as JSON—NO extra text, explanations, or formatting outside the JSON block.  
+      5. Never include double quotes (") in the lyrics text.
       
       Enhancements for Creativity & Musical Expression:  
       - Song structure clarity: Use brackets [ ] to define sections such as:  
@@ -83,6 +135,7 @@ export class SongMetadataGenerator {
     this.chain = RunnableSequence.from([
       promptTemplate,
       llm,
+      extractJsonRunnable,
       new JsonOutputParser(),
     ]);
   }
@@ -97,7 +150,6 @@ export class SongMetadataGenerator {
   async generateMetadata(idea: string): Promise<SongMetadata> {
     try {
       const metadata = await this.chain.invoke({ idea });
-      Logger.info(`Generated metadata: ${JSON.stringify(metadata)}`);
 
       // Validate response structure
       if (!metadata?.title || !metadata?.lyrics || !metadata?.tags) {

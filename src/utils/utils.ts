@@ -15,6 +15,7 @@ import { Logger } from "./logger";
  */
 export async function calculateDuration(audioUrl: string): Promise<number> {
   try {
+    Logger.info("Calculating music duration...");
     const response = await axios.get(audioUrl, {
       responseType: "arraybuffer",
     });

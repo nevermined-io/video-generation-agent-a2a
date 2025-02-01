@@ -130,14 +130,12 @@ export class SunoClient {
 
       return {
         jobId: status.data.jobId,
-        musics: await Promise.all(
-          status.data.musics.map(async (music: any) => ({
-            musicId: music.musicId,
-            title: music.title,
-            audioUrl: music.audioUrl,
-            duration: await calculateDuration(music.audioUrl),
-          }))
-        ),
+        music: {
+          musicId: status.data.musics[0].musicId,
+          title: status.data.musics[0].title,
+          audioUrl: status.data.musics[0].audioUrl,
+          duration: await calculateDuration(status.data.musics[0].audioUrl),
+        },
       };
     } catch (error) {
       const errorMessage = `Retrieval failed: ${(error as Error).message}`;

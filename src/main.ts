@@ -21,6 +21,8 @@ import {
   AGENT_DID,
   SUNO_API_KEY,
   OPENAI_API_KEY,
+  IS_DUMMY,
+  DUMMY_JOB_ID,
 } from "./config/env";
 import { SongMetadataGenerator } from "./songMetadataGenerator";
 
@@ -128,7 +130,7 @@ async function handleAutoGenerateMetadataStep(
       ...step,
       step_status: AgentExecutionStatus.Completed,
       output: "Successfully generated metadata via LangChain",
-      output_artifacts: [JSON.stringify({ title, lyrics, tags, idea })],
+      output_artifacts: [{ title, lyrics, tags, idea }],
     });
   } catch (error) {
     Logger.error(`autoGenerateMetadata error: ${(error as Error).message}`);
@@ -170,7 +172,7 @@ async function handleBuildSongStep(
     let idea = "";
 
     try {
-      const artifacts = JSON.parse(step.input_artifacts || "[]");
+      const artifacts = JSON.parse(step.input_artifacts || []);
       if (artifacts[0]) {
         const meta = artifacts[0];
         tags = meta.tags || [];
@@ -185,24 +187,29 @@ async function handleBuildSongStep(
     }
 
     const client = new SunoClient(SUNO_API_KEY);
-    const jobId = await client.generateSong(idea, { tags, title, lyrics });
+    let jobId: string;
+    if (IS_DUMMY) {
+      Logger.warn("Using dummy job ID for testing...");
+      jobId = DUMMY_JOB_ID;
+    } else {
+      jobId = await client.generateSong(idea, { tags, title, lyrics });
+    }
+
     await client.waitForCompletion(jobId);
 
     const songData = await client.getSong(jobId);
-    if (!songData.musics?.length) {
-      throw new Error("No music tracks returned from Suno.");
-    }
+    Logger.info(`Song generated with job id ${jobId}`);
 
-    const mainTrack = songData.musics[0];
     const finalOutput = [
       {
         tags,
         lyrics,
         title,
-        duration: mainTrack.duration,
-        songUrl: mainTrack.audioUrl,
+        duration: songData.music.duration,
+        songUrl: songData.music.audioUrl,
       },
     ];
+    Logger.info(`Song URL: ${songData.music.audioUrl}`);
 
     await payments.query.updateStep(step.did, {
       ...step,
