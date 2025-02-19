@@ -1,11 +1,3 @@
-/**
- * @file main.ts
- * @description A refactored Song Generator Agent using Nevermined Query Protocol. It:
- *              1) Handles an "init" step, deciding whether we have needed metadata or not.
- *              2) Optionally calls "autoGenerateMetadata" to produce (title, lyrics, tags) via LangChain.
- *              3) Finally calls "buildSong" to generate the actual audio via Suno.
- */
-
 import "dotenv/config";
 import {
   Payments,
@@ -312,6 +304,10 @@ async function main() {
       subscribeEventTypes: ["step-updated"],
       getPendingEventsOnSubscribe: false,
     });
+
+    if (IS_DUMMY) {
+      Logger.warn("Running in dummy mode. No transactions will be made.");
+    }
 
     Logger.success(
       "Song Generator Agent is running and listening for steps..."

@@ -170,8 +170,12 @@ export class SunoClient {
               Logger.error("Server error");
               reject(new Error(status.data?.message || "Unknown error"));
               break;
+            case "ON_QUEUE":
+              Logger.info(`Job ${status.data?.jobId}: Waiting in queue...`);
+              setTimeout(poll, interval);
+              break;
             default:
-              Logger.info(`Progress: ${status.progress}%`);
+              Logger.info(`Status: ${JSON.stringify(status)}`);
               setTimeout(poll, interval);
           }
         } catch (error) {
