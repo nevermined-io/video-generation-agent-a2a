@@ -158,25 +158,9 @@ async function handleBuildSongStep(
 
   try {
     // Parse metadata from input_artifacts if present
-    let tags: string[] = [];
-    let lyrics = "";
-    let title = "Untitled";
-    let idea = "";
-
-    try {
-      const artifacts = JSON.parse(step.input_artifacts || []);
-      if (artifacts[0]) {
-        const meta = artifacts[0];
-        tags = meta.tags || [];
-        lyrics = meta.lyrics || "";
-        title = meta.title || "Untitled";
-        idea = meta.idea || "";
-      }
-    } catch {
-      Logger.warn(
-        "Could not parse metadata. Using minimal data for buildSong."
-      );
-    }
+    const [{ tags, lyrics, title, idea }] = JSON.parse(
+      step.input_artifacts || "[]"
+    );
 
     const client = new SunoClient(SUNO_API_KEY);
     let jobId: string;
