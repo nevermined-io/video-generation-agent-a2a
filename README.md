@@ -1,5 +1,3 @@
-Ha razonado durante un segundo
-
 [![banner](https://raw.githubusercontent.com/nevermined-io/assets/main/images/logo/banner_logo.png)](https://nevermined.io)
 
 Song Generator Agent (TypeScript)
@@ -261,5 +259,3 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions 
 and limitations under the License.
 ```
-
-With this **Song Generator Agent**, you can reliably automate the creation of lyrics and music tracks for any AI-driven multimedia project, ensuring you have a coherent audio foundation before moving on to more advanced tasks—like script creation, image generation, or full video assembly.
