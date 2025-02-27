@@ -1,324 +1,265 @@
+Ha razonado durante un segundo
+
 [![banner](https://raw.githubusercontent.com/nevermined-io/assets/main/images/logo/banner_logo.png)](https://nevermined.io)
 
 Song Generator Agent (TypeScript)
-=========================================================
+=================================
 
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
-[![TypeScript Version](https://img.shields.io/badge/typescript-%5E5.7.0-blue)](https://www.typescriptlang.org/)
-[![MIT License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
+> A TypeScript agent that listens for tasks via the **Nevermined Payments** framework, automatically generates lyrics and other metadata using **LangChain** + **OpenAI**, and then produces a final song audio track through **Suno**’s AI Music Generation API. It manages multiple steps internally, uses a modular architecture, and can be easily scaled or extended.
 
-A TypeScript implementation for interacting with Suno's AI Music Generation API, following SOLID principles and professional coding standards. Now featuring an intermediate step for automatic lyrics generation using LangChain and OpenAI.
+* * *
 
-## Features ✨
+**Description**
+---------------
 
-- **Full TypeScript Support** with strict type checking
-- **SOLID-Compliant Architecture**
-- **Comprehensive Error Handling**
-- **Configurable Generation Parameters**
-- **Real-Time Progress Monitoring**
-- **JSDoc Documentation**
-- **Environment-Based Configuration**
-- **Automatic Lyrics Generation** using LangChain and OpenAI
-- **Integration with Nevermined Payments** for task and step management
-- **Modular Architecture** for maintainability and scalability
+The **Song Generator Agent** is designed to:
 
-## Installation ⚙️
+1.  **Receive** prompts or “ideas” for songs (e.g., “A futuristic R&B track about neon cities”).
+2.  **Optionally** generate missing metadata (e.g., lyrics, title, tags) using **LangChain** and **OpenAI**.
+3.  **Invoke** the **Suno** API to synthesize an audio track (MP3) based on the prompt + metadata.
+4.  **Output** the final track’s URL, title, duration, and lyrics.
+5.  **Integrate** seamlessly with **Nevermined Payments**, listening for “step-updated” events and updating steps as they progress or fail.
 
-```bash
-git clone https://github.com/nevermined-io/song-generation-agent.git
-cd song-generation-agent
-yarn install
-```
+This agent is well-suited for multi-step AI workflows where you want to automate music production.
 
-## Configuration ⚙️
+* * *
 
-1. **Create the `.env` file:**
+**Table of Contents**
+---------------------
 
+*   [Features](#features)
+*   [Prerequisites](#prerequisites)
+*   [Installation](#installation)
+*   [Environment Variables](#environment-variables)
+*   [Project Structure](#project-structure)
+*   [Architecture & Workflow](#architecture--workflow)
+*   [Usage](#usage)
+*   [How It Works Internally](#how-it-works-internally)
+*   [Development & Testing](#development--testing)
+*   [License](#license)
+
+* * *
+
+**Features**
+------------
+
+*   **Nevermined Integration**: Subscribes to tasks via `step-updated` events and updates them automatically.
+*   **Automatic Metadata Generation**: Uses **LangChain** + **OpenAI** for lyrics, titles, and tag creation.
+*   **Suno Music Generation**: Calls Suno’s AI for track synthesis, monitors progress, and retrieves the final MP3.
+*   **Concurrent Step Handling**: Splits tasks into multiple steps (e.g., `autoGenerateMetadata`, `buildSong`), each with its own logic.
+*   **Configurable**: Customize your prompts, model versions, or usage of OpenAI.
+*   **Logging & Error Handling**: Comprehensive logs (info, success, warn, error) via a custom `Logger`.
+*   **SOLID, Modular Architecture**: Each function or class has a single responsibility, ensuring maintainability.
+
+* * *
+
+**Prerequisites**
+-----------------
+
+*   **Node.js** (>= 18.0.0 recommended)
+*   **TypeScript** (project built on ^5.7.0 or later)
+*   **Nevermined** credentials (API key, environment settings, and an `AGENT_DID`)
+*   **Suno API Key** (for music generation)
+*   **OpenAI API Key** (for metadata/lyrics generation via LangChain)
+
+* * *
+
+**Installation**
+----------------
+
+1.  **Clone** the repository:
+    
     ```bash
-    cp .env.example .env
+    git clone https://github.com/nevermined-io/song-generation-agent.git
+    cd song-generation-agent
     ```
-
-2. **Add your API keys and configurations:**
-
-    ```env
-    SUNO_API_KEY=your_suno_api_key
-    OPENAI_API_KEY=your_openai_api_key
-    NVM_API_KEY=your_nevermined_api_key
-    NVM_ENVIRONMENT=testing # or production
-    AGENT_DID=your_agent_did
+    
+2.  **Install** dependencies:
+    
+    ```bash
+    yarn install
     ```
+    
+3.  **Build** the project (optional for production):
+    
+    ```bash
+    yarn build
+    ```
+    
 
-## Usage 🚀
+* * *
 
-### Running the Agent
+**Environment Variables**
+-------------------------
 
-The Song Generator Agent operates as a background service that listens for tasks via the Nevermined API. It processes each task by dividing it into manageable steps, handling metadata generation, and interacting with the Suno API to generate music.
+Rename `.env.example` to `.env` and set the required variables:
 
-To start the agent:
-
-```bash
-yarn dev
+```env
+SUNO_API_KEY=your_suno_api_key
+OPENAI_API_KEY=your_openai_api_key
+NVM_API_KEY=your_nevermined_api_key
+NVM_ENVIRONMENT=testing
+AGENT_DID=did:nv:xxx-song-agent
+IS_DUMMY=false
+DUMMY_JOB_ID=foobar
 ```
 
-**Note:** Ensure that your `.env` file is properly configured with all necessary API keys and environment variables before running the agent.
+*   `SUNO_API_KEY`
+*   `OPENAI_API_KEY`
+*   `NVM_API_KEY`
+*   `NVM_ENVIRONMENT` (e.g., `testing`, `staging`, or `production`)
+*   `AGENT_DID` (identifies this Song Generator Agent)
+*   `IS_DUMMY` / `DUMMY_JOB_ID` (optional testing flags)
 
-## Architecture 🏗️
+* * *
+
+**Project Structure**
+---------------------
 
 ```
-├── .vscode/
-│   └── launch.json               # VS Code debug configuration
-├── src/
-│   ├── clients/
-│   │   └── sunoClient.ts         # Suno API client implementation
-│   ├── config/
-│   │   └── env.ts                # Environment variable configuration
-│   ├── interfaces/
-│   │   └── apiResponses.ts       # Type definitions for API responses
-│   ├── utils/
-│   │   ├── logger.ts             # Custom logging utility
-│   │   ├── utils.ts              # General utility functions
-│   │   └── checkEnv.ts           # Environment validation logic
-│   ├── songMetadataGenerator.ts  # Lyrics and metadata generator using LangChain
-│   └── main.ts                   # Main application entry point
-├── .env.example                  # Environment variable template
-├── .gitignore                    # Git exclusion rules
-├── package.json                  # Project dependencies and scripts
-├── tsconfig.json                 # TypeScript configuration
-└── README.md                     # Project documentation
+.
+├── clients/
+│   └── sunoClient.ts          # Client for interacting with the Suno API
+├── config/
+│   └── env.ts                 # Loads environment variables from .env
+├── interfaces/
+│   └── apiResponses.ts        # Type definitions for Suno API responses
+├── utils/
+│   ├── logger.ts              # Logging utility with color-coded levels
+│   ├── utils.ts               # General helpers (e.g., track duration)
+│   └── checkEnv.ts            # Validates environment variables on startup
+├── songMetadataGenerator.ts   # Class that uses LangChain+OpenAI to generate metadata
+├── main.ts                    # Main entry, listens to step-updated events & routes steps
+├── package.json
+├── tsconfig.json
+└── README.md                  # This file
 ```
 
-## How It Works 🧠
+Key highlights:
 
-The **Song Generator Agent** utilizes the **Nevermined Payments** library to receive tasks, divide them into steps, and manage them sequentially. Here's a detailed breakdown of the workflow:
+*   **`main.ts`**: Entry point that initializes **Nevermined** payments, subscribes to steps for this agent’s DID, and routes to step handlers (`handleInitStep`, `handleAutoGenerateMetadataStep`, `handleBuildSongStep`).
+*   **`songMetadataGenerator.ts`**: Orchestrates **LangChain** + **OpenAI** calls to produce lyrics, a title, and tags.
+*   **`clients/sunoClient.ts`**: Talks to the **Suno** API for generating music. It can poll for status, retrieve the final track URL, and handle errors gracefully.
 
-1. **Task Reception:**
-   - The agent subscribes to `step-updated` events from Nevermined.
-   - Upon receiving a task (`init`), the agent checks if the necessary metadata (lyrics, title, tags) is already present.
+* * *
 
-2. **Step Management:**
-   - **Step 1: `init`**
-     - Verifies the presence of metadata.
-     - If metadata is missing, it creates two new steps:
-       - `autoGenerateMetadata`: Generates metadata using LangChain and OpenAI.
-       - `buildSong`: Generates the song using the generated metadata.
-     - If metadata is present, it directly creates the `buildSong` step.
+**Architecture & Workflow**
+---------------------------
 
-   - **Step 2: `autoGenerateMetadata`**
-     - Utilizes `SongMetadataGenerator` to generate `title`, `lyrics`, and `tags` based on a provided idea or prompt.
-     - Stores the generated metadata in `output_artifacts`.
-     - Marks the step as completed.
+When the **Song Generator Agent** receives a new **task** (usually labeled `init` for the first step), it checks if the user provided metadata (lyrics, title, tags). If not, the agent creates an intermediate step to **auto-generate metadata** via `SongMetadataGenerator`. Finally, it proceeds to the **buildSong** step, which:
 
-   - **Step 3: `buildSong`**
-     - Uses `SunoClient` to send a request to Suno's API with the metadata.
-     - Monitors the generation progress through `waitForCompletion`.
-     - Stores the generated song's URL and duration in `output_artifacts`.
-     - Marks the step as completed.
+1.  Calls **Suno** to start a music generation job.
+2.  Periodically checks the status until it’s either `SUCCESS` or `FAILED`.
+3.  Logs and returns the final audio URL, duration, and metadata to **Nevermined**.
 
-3. **Step Updates:**
-   - Each time a step is completed or fails, the agent updates the step's status in Nevermined using `payments.query.updateStep`.
-   - In case of errors, the agent marks the step as `Failed` with a descriptive message.
+### Step-by-Step Flow
 
-## Documentation 📚
+1.  **init**
+    
+    *   Checks for existing metadata in `step.input_artifacts`.
+    *   If missing, creates `autoGenerateMetadata` then `buildSong`.
+    *   Otherwise, creates `buildSong` directly.
+2.  **autoGenerateMetadata**
+    
+    *   Invokes the `SongMetadataGenerator` to produce a new title, lyrics, and tags.
+    *   Stores them in `output_artifacts`.
+3.  **buildSong**
+    
+    *   Uses `SunoClient` to create a music generation job.
+    *   Waits for completion (by periodically checking status).
+    *   Retrieves the final audio file, calculates duration, and updates `output_artifacts`.
 
-### SunoClient Class
+* * *
 
-#### Methods:
-- `generateSong(prompt: string, options?: SongOptions): Promise<string>`
-- `checkStatus(jobId: string): Promise<StatusResponse>`
-- `getSong(jobId: string): Promise<SongResponse>`
-- `waitForCompletion(jobId: string, interval?: number): Promise<void>`
+**Usage**
+---------
 
-### SongMetadataGenerator Class
+1.  **Configure** `.env` with the relevant keys.
+    
+2.  **Start** the agent in development mode:
+    
+    ```bash
+    yarn dev
+    ```
+    
+    The agent will then log into **Nevermined** and wait for any `step-updated` events targeting its `AGENT_DID`.
+    
+3.  **Send a Prompt**
+    
+    *   Typically, a higher-level Orchestrator (e.g., the **Music Video Orchestrator**) dispatches tasks that mention this Song Generator’s DID.
+    *   Once triggered, the agent spawns steps for metadata creation (if needed) and final audio generation.
 
-#### Methods:
-- `generateMetadata(idea: string): Promise<SongMetadata>`
+* * *
 
-#### Interfaces:
-- `SongMetadata`
-  - `title: string`
-  - `lyrics: string`
-  - `tags: string[]`
+**How It Works Internally**
+---------------------------
 
-### Response Interfaces
-- `GenerateSongResponse`
-- `StatusResponse` 
-- `SongResponse`
-- `MusicTrack`
-- `SongOptions`
+1.  **Nevermined Subscription**
+    
+    *   `Payments.getInstance({...})` authenticates with the **Nevermined** server.
+    *   `payments.query.subscribe(processSteps(payments), {...})` sets up an event listener.
+2.  **Processing Steps**
+    
+    *   A function `processSteps(...)` receives each `step-updated` event.
+    *   It fetches the latest step info with `payments.query.getStep(...)`.
+    *   Based on `step.name`, it calls the corresponding handler function.
+3.  **Handlers**
+    
+    *   **`handleInitStep()`**: Checks for existing metadata. If missing, creates two sub-steps: `autoGenerateMetadata`, then `buildSong`. If present, only creates `buildSong`.
+    *   **`handleAutoGenerateMetadataStep()`**: Uses **LangChain** + **OpenAI** to produce a JSON object with `title`, `lyrics`, `tags`.
+    *   **`handleBuildSongStep()`**: Calls **Suno** using `SunoClient`. Waits until the job is complete, then stores the final track details.
+4.  **Logging & Error Handling**
+    
+    *   Each function logs relevant info or errors with the custom `Logger`.
+    *   If any step fails (e.g., Suno returns an error), the handler updates the step to `Failed`.
+5.  **Output Artifacts**
+    
+    *   Agents store data in `output_artifacts` (e.g., an array of objects describing the final song).
+    *   This is how other steps or orchestrators retrieve the MP3 URL, duration, or lyrics.
 
-## Development 🛠️
+* * *
 
-Start the development server:
-```bash
-yarn dev
-```
+**Development & Testing**
+-------------------------
 
-Build the production version:
+### Running Locally
+
+*   **Start** the service in dev mode:
+    
+    ```bash
+    yarn dev
+    ```
+    
+*   By default, it subscribes to the `AGENT_DID` in your `.env`.
+    
+
+### Building for Production
+
 ```bash
 yarn build
 ```
 
-## Testing ✅
+* * *
 
-Run unit tests:
-```bash
-yarn test
-```
-
-## Contributing 🤝
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
----
-
-## Additional Details on Implementation
-
-### Integration with Nevermined Payments
-
-The **Song Generator Agent** leverages the **Nevermined Payments** library to handle task reception and step management. Here's how the integration works:
-
-1. **Agent Initialization:**
-   - An instance of `Payments` is created using the provided credentials (`NVM_API_KEY` and `NVM_ENVIRONMENT`).
-   - The agent subscribes to `step-updated` events to receive notifications about new tasks or updates to existing steps.
-
-2. **Processing Steps:**
-   - Upon receiving a `step-updated` event, the agent retrieves the step details using `payments.query.getStep`.
-   - Depending on the step's name (`init`, `autoGenerateMetadata`, `buildSong`), the agent invokes the corresponding handler function.
-   - Each handler performs its specific task and updates the step's status using `payments.query.updateStep`.
-
-3. **Creating Steps:**
-   - The `handleInitStep` function determines whether metadata generation is required.
-   - If metadata is missing, it creates the `autoGenerateMetadata` and `buildSong` steps using `payments.query.createSteps`.
-   - If metadata is present, it directly creates the `buildSong` step.
-
-4. **Error Handling:**
-   - If any step fails, the agent marks the step as `Failed` with a descriptive reason using `payments.query.updateStep`.
-
-### Workflow Diagram
+**License**
+-----------
 
 ```
-+-----------------------+
-|  Nevermined Payments  |
-+----------+------------+
-           |
-           v
-+-----------------------+
-|  Song Generator Agent |
-+----------+------------+
-           |
-           | (Step: init)
-           |
-           v
-+-----------------------+
-|    Handle Init Step   |
-+----------+------------+
-           |
-           |-- If no metadata -->
-           |       |
-           |       v
-           | +------------------------+
-           | | Handle AutoGenerate    |
-           | |     Metadata Step      |
-           | +-----------+------------+
-           |             |
-           |             v
-           | +------------------------+
-           | |  Handle Build Song     |
-           | +-----------+------------+
-           |
-           |-- If metadata -->
-                   |
-                   v
-         +------------------------+
-         |   Handle Build Song    |
-         +------------------------+
-```
+Apache License 2.0
 
-### Dependencies and Additional Configuration
+(C) 2025 Nevermined AG
 
-- **LangChain and OpenAI:**
-  - Ensure you have the correct OpenAI API keys in your `.env` file.
-  - LangChain is used for generating lyrics via the `SongMetadataGenerator`.
-
-- **Music-Metadata:**
-  - Utilized to extract the duration of generated tracks.
-
-- **Nevermined Payments:**
-  - Configured with `NVM_API_KEY`, `NVM_ENVIRONMENT`, and `AGENT_DID` for authentication and task management.
-
-## Support Files
-
-### `.env.example`
-
-```env
-SUNO_API_KEY=
-OPENAI_API_KEY=
-NVM_API_KEY=
-NVM_ENVIRONMENT=testing
-AGENT_DID=
-```
-
-### `.gitignore`
-
-```
-# Dependencies
-node_modules/
-
-# Build artifacts
-dist/
-
-# Environment
-.env
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-```
-
----
-
-## Final Considerations
-
-1. **Accessing Private Functions for Testing:**
-   - For testing purposes, you're accessing private functions via casting to `any`. While acceptable in this context, consider restructuring your code to facilitate testing without exposing private functions.
-
-2. **TypeScript and Jest Configuration:**
-   - Ensure your TypeScript (`tsconfig.json`) and Jest (`jest.config.ts`) configurations are properly set up to handle ESM and CommonJS interoperability.
-
-3. **Error Handling and Logging:**
-   - Utilize the `Logger` class to maintain consistent logging and facilitate debugging.
-
-4. **Extensibility and Maintainability:**
-   - The modular architecture allows for easy addition of new functionalities, such as additional steps or integrations with other APIs.
-
-5. **Security:**
-   - Keep your API keys secure and avoid exposing them in the repository.
-
----
-
-
-License
--------
-
-```
-Copyright 2025 Nevermined AG
-
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 2.0 (the "License"); 
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+You may obtain a copy of the License at:
 
    http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Unless required by applicable law or agreed to in writing, software 
+distributed under the License is distributed on an "AS IS" BASIS, 
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+See the License for the specific language governing permissions 
+and limitations under the License.
 ```
+
+With this **Song Generator Agent**, you can reliably automate the creation of lyrics and music tracks for any AI-driven multimedia project, ensuring you have a coherent audio foundation before moving on to more advanced tasks—like script creation, image generation, or full video assembly.
