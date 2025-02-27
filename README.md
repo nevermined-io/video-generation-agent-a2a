@@ -22,6 +22,29 @@ This agent is well-suited for multi-step AI workflows where you want to automate
 
 * * *
 
+**Related Projects**
+--------------------
+
+This **Video Generator Agent** is part of a larger ecosystem of AI-driven media creation. For a complete view of how multiple agents work together, see:
+
+1.  [Music Orchestrator Agent](https://github.com/nevermined-io/music-video-orchestrator)
+    
+    *   Coordinates end-to-end workflows: collects user prompts, splits them into tasks, pays agents in multiple tokens, merges final output.
+2.  [Image / Video Generator Agent](https://github.com/nevermined-io/video-generator-agent)
+    
+    *   Produces Images / Video using 3rd party wrapper APIs (Fal.ai and TTapi, wrapping Flux and Kling.ai)
+3.  [Script Generator Agent](https://github.com/nevermined-io/music-video-script-generator-agent)
+    
+    *   Generates cinematic scripts, extracts scene info, identifies settings and characters, producing prompts for video generation.
+
+**Workflow Example**:
+
+```
+[ User Prompt ] --> [Music Orchestrator] --> [Song Generation] --> [Script Generation] --> [Image/Video Generation] --> [Final Compilation]
+```
+
+* * *
+
 **Table of Contents**
 ---------------------
 
