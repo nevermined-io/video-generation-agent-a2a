@@ -25,7 +25,7 @@ This agent is well-suited for multi-step AI workflows where you want to automate
 **Related Projects**
 --------------------
 
-This **Video Generator Agent** is part of a larger ecosystem of AI-driven media creation. For a complete view of how multiple agents work together, see:
+This **Song Generator Agent** is part of a larger ecosystem of AI-driven media creation. For a complete view of how multiple agents work together, see:
 
 1.  [Music Orchestrator Agent](https://github.com/nevermined-io/music-video-orchestrator)
     
