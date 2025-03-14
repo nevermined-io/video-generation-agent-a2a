@@ -30,12 +30,17 @@ import { SongMetadataGenerator } from "./songMetadataGenerator";
 function hasMetadata(step: any): boolean {
   if (!step.input_artifacts) return false;
   try {
-    const artifacts = JSON.parse(step.input_artifacts);
-    if (Array.isArray(artifacts) && artifacts[0]) {
-      return !!(artifacts[0].lyrics && artifacts[0].title && artifacts[0].tags);
+    if (Array.isArray(step.input_artifacts) && step.input_artifacts[0]) {
+      return !!(
+        step.input_artifacts[0].lyrics &&
+        step.input_artifacts[0].title &&
+        step.input_artifacts[0].tags
+      );
     }
   } catch {
-    Logger.warn("Could not parse input_artifacts as JSON");
+    Logger.error(
+      `Could not parse input_artifacts as JSON: ${step.input_artifacts}`
+    );
   }
   return false;
 }
@@ -93,7 +98,7 @@ async function handleInitStep(step: any, payments: Payments): Promise<void> {
     ...step,
     step_status: AgentExecutionStatus.Completed,
     output: step.input_query || "A generic acoustic folk song",
-    output_artifacts: JSON.parse(step.input_artifacts),
+    output_artifacts: step.input_artifacts,
   });
 }
 
@@ -158,9 +163,7 @@ async function handleBuildSongStep(
 
   try {
     // Parse metadata from input_artifacts if present
-    const [{ tags, lyrics, title, idea }] = JSON.parse(
-      step.input_artifacts || "[]"
-    );
+    const [{ tags, lyrics, title, idea }] = step.input_artifacts;
 
     const client = new SunoClient(SUNO_API_KEY);
     let jobId: string;
