@@ -1,53 +1,49 @@
 /**
+ * @file logger.ts
+ * @description Simple logging utility
+ */
+
+/**
  * @class Logger
- * @description Provides standardized logging functionality with colors
+ * @description Provides logging functionality with different levels
  */
 export class Logger {
-  private static colors = {
-    reset: "\x1b[0m",
-    cyan: "\x1b[36m",
-    green: "\x1b[32m",
-    yellow: "\x1b[33m",
-    red: "\x1b[31m",
+  private static readonly LOG_LEVELS = {
+    ERROR: "ERROR",
+    WARN: "WARN",
+    INFO: "INFO",
+    DEBUG: "DEBUG",
   };
 
   /**
-   * @static
-   * @method info
-   * @description Log informational messages
-   * @param {string} message - Message to log
-   */
-  static info(message: string): void {
-    console.log(`${this.colors.cyan}[INFO]${this.colors.reset} ${message}`);
-  }
-
-  /**
-   * @static
-   * @method success
-   * @description Log success messages
-   * @param {string} message - Message to log
-   */
-  static success(message: string): void {
-    console.log(`${this.colors.green}[SUCCESS]${this.colors.reset} ${message}`);
-  }
-
-  /**
-   * @static
-   * @method warn
-   * @description Log warning messages
-   * @param {string} message - Message to log
-   */
-  static warn(message: string): void {
-    console.warn(`${this.colors.yellow}[WARN]${this.colors.reset} ${message}`);
-  }
-
-  /**
-   * @static
    * @method error
    * @description Log error messages
-   * @param {string} message - Message to log
    */
-  static error(message: string): void {
-    console.error(`${this.colors.red}[ERROR]${this.colors.reset} ${message}`);
+  public static error(message: string, ...args: any[]): void {
+    console.error(`[${this.LOG_LEVELS.ERROR}] ${message}`, ...args);
+  }
+
+  /**
+   * @method warn
+   * @description Log warning messages
+   */
+  public static warn(message: string, ...args: any[]): void {
+    console.warn(`[${this.LOG_LEVELS.WARN}] ${message}`, ...args);
+  }
+
+  /**
+   * @method info
+   * @description Log info messages
+   */
+  public static info(message: string, ...args: any[]): void {
+    console.info(`[${this.LOG_LEVELS.INFO}] ${message}`, ...args);
+  }
+
+  /**
+   * @method debug
+   * @description Log debug messages
+   */
+  public static debug(message: string, ...args: any[]): void {
+    console.debug(`[${this.LOG_LEVELS.DEBUG}] ${message}`, ...args);
   }
 }

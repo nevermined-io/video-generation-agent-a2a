@@ -1,65 +1,122 @@
 /**
+ * @file apiResponses.ts
+ * @description Interfaces for Suno API responses and options
+ */
+
+import { TaskYieldUpdate } from "../interfaces/a2a";
+
+/**
+ * @interface SongOptions
+ * @description Options for song generation including model and audio format preferences
+ */
+export interface SongOptions {
+  /** @property {string} model - The model version to use for generation */
+  model?: string;
+  /** @property {string} format - The desired audio format for the output */
+  format?: string;
+  /** @property {number} duration - The target duration in seconds */
+  duration?: number;
+  /** @property {string} style - The musical style or genre */
+  style?: string;
+  /** @property {string} mood - The emotional mood of the song */
+  mood?: string;
+  /** @property {string} tempo - The speed/tempo of the song */
+  tempo?: string;
+}
+
+/**
  * @interface GenerateSongResponse
- * @description Response structure for song generation request
- * @property {string} jobId - Unique identifier for the generation job
- * @property {any} [key: string] - Additional properties from the API
+ * @description Response from the song generation endpoint
  */
 export interface GenerateSongResponse {
+  /** @description Unique identifier for the generated song */
+  id: string;
+  /** @description Current status of the generation */
+  status: string;
+  /** @description Estimated completion time in seconds */
+  estimatedTime?: number;
+}
+
+/**
+ * @interface StatusData
+ * @description Data about the current status of a song generation task
+ */
+export interface StatusData {
+  /** @property {string} status - Current status of the task */
+  status: "submitted" | "working" | "completed" | "failed" | "cancelled";
+  /** @property {number} progress - Progress percentage */
+  progress: number;
+  /** @property {string} [error] - Error message if any */
+  error?: string;
+  /** @property {string} jobId - Unique identifier of the job */
   jobId: string;
-  [key: string]: any;
 }
 
 /**
  * @interface StatusResponse
- * @description Response structure for generation status check
- * @property {"SUCCESS" | "FAILED" | "PROCESSING"} status - Current job status
- * @property {number} progress - Completion percentage (0-100)
- * @property {any} data - Raw response data from the API
+ * @description Response containing the current status of a generation task
  */
 export interface StatusResponse {
-  status: "SUCCESS" | "FAILED" | "PROCESSING" | "ON_QUEUE";
+  /** @property {string} status - Current status of the task */
+  status: "submitted" | "working" | "completed" | "failed" | "cancelled";
+  /** @property {number} progress - Progress percentage as a number */
   progress: number;
-  data: any;
+  /** @property {StatusData} [data] - Additional status information */
+  data?: StatusData;
 }
 
 /**
- * @interface MusicTrack
- * @description Metadata for a generated music track
- * @property {string} musicId - Unique track identifier
- * @property {string} title - Track title
- * @property {string} audioUrl - URL to access the audio file
- * @property {number} duration - Track duration in seconds
+ * @interface WaitForCompletionOptions
+ * @description Options for waitForCompletion method
  */
-interface MusicTrack {
-  musicId: string;
-  title: string;
-  audioUrl: string;
-  duration: number;
+export interface WaitForCompletionOptions {
+  timeout?: number;
+  interval?: number;
+  onStatusUpdate?: (status: StatusData) => TaskYieldUpdate | null;
 }
 
 /**
  * @interface SongResponse
- * @description Complete response for a generated song
- * @property {string} jobId - Original job identifier
- * @property {MusicTrack[]} musics - Array of generated tracks
+ * @description Response containing the generated song data
  */
 export interface SongResponse {
   jobId: string;
-  music: MusicTrack;
+  music: {
+    musicId: string;
+    title: string;
+    audioUrl: string;
+    duration: number;
+  };
+  metadata: {
+    title: string;
+    lyrics?: string;
+    tags?: string[];
+  };
 }
 
 /**
- * @interface SongOptions
- * @description Configuration options for song generation
- * @property {string} [title] - Custom title for the track
- * @property {string[]} [tags] - Style tags for the generation
- * @property {string} [gptDescriptionPrompt] - Prompt for automatic lyrics generation
- * @property {"chirp-v3-0" | "chirp-v3-5" | "chirp-v4"} [mv] - Model version to use
+ * @interface SongGenerationOptions
+ * @description Extended options for song generation including all possible parameters
  */
-export interface SongOptions {
+export interface SongGenerationOptions {
+  /** @property {string} prompt - Description of the song to generate */
+  prompt: string;
+  /** @property {string} title - Title of the song */
   title?: string;
-  tags?: string[];
-  gptDescriptionPrompt?: string;
+  /** @property {string} lyrics - Lyrics for the song */
   lyrics?: string;
-  mv?: "chirp-v3-0" | "chirp-v3-5" | "chirp-v4";
+  /** @property {string[]} tags - Array of tags describing the song */
+  tags?: string[];
+}
+
+/**
+ * @interface SongGenerationResponse
+ * @description Response from the song generation endpoint with task tracking info
+ * @extends GenerateSongResponse
+ */
+export interface SongGenerationResponse extends GenerateSongResponse {
+  /** @property {string} [error] - Error message if generation failed */
+  error?: string;
+  /** @property {SongOptions} [options] - Options used for generation */
+  options?: SongOptions;
 }
