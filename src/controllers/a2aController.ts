@@ -13,6 +13,7 @@ import { TaskQueue } from "../core/taskQueue";
 import { Logger } from "../utils/logger";
 import { SongGenerationController } from "./songController";
 import { PushNotificationService } from "../services/pushNotificationService";
+import { StreamingService } from "../services/streamingService";
 import {
   PushNotificationConfig,
   PushNotificationEvent,
@@ -53,6 +54,7 @@ export class A2AController {
   private taskQueue: TaskQueue;
   private songController: SongGenerationController;
   private pushNotificationService: PushNotificationService;
+  private streamingService: StreamingService;
 
   /**
    * @constructor
@@ -89,18 +91,20 @@ export class A2AController {
         retryDelay: config.retryDelay || 1000,
       });
     this.pushNotificationService = new PushNotificationService();
+    this.streamingService = new StreamingService();
 
-    // Set up task store listeners for push notifications
+    // Set up task store listeners for notifications
     this.setupTaskStoreListeners();
   }
 
   /**
    * @private
    * @method setupTaskStoreListeners
-   * @description Set up listeners for task store events to trigger push notifications
+   * @description Set up listeners for task store events to trigger notifications
    */
   private setupTaskStoreListeners(): void {
     this.taskStore.addStatusListener(async (task: Task) => {
+      // Handle push notifications
       const event: PushNotificationEvent = {
         type: PushNotificationEventType.STATUS_UPDATE,
         taskId: task.id,
@@ -112,6 +116,9 @@ export class A2AController {
       };
 
       this.pushNotificationService.notify(task.id, event);
+
+      // Handle streaming updates
+      this.streamingService.notifyTaskUpdate(task);
 
       // Send completion event if task is in final state
       if (
@@ -435,72 +442,11 @@ export class A2AController {
     res: Response
   ): Promise<void> => {
     try {
-      // Set headers for Server-Sent Events (SSE)
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-
       // Create and store the task
       const task = await this.createTask(req.body.prompt, req.body.sessionId);
 
-      // Send initial task creation confirmation
-      res.write(
-        `data: ${JSON.stringify({
-          id: task.id,
-          status: task.status,
-          final: false,
-        })}\n\n`
-      );
-
-      // Set up task status update listener
-      const statusListener = async (updatedTask: Task) => {
-        if (updatedTask.id === task.id) {
-          // Send status update
-          res.write(
-            `data: ${JSON.stringify({
-              id: updatedTask.id,
-              status: updatedTask.status,
-              final:
-                updatedTask.status.state === TaskState.COMPLETED ||
-                updatedTask.status.state === TaskState.CANCELLED ||
-                updatedTask.status.state === TaskState.FAILED,
-            })}\n\n`
-          );
-
-          // If task has artifacts, send them
-          if (updatedTask.artifacts?.length) {
-            updatedTask.artifacts.forEach((artifact) => {
-              res.write(
-                `data: ${JSON.stringify({
-                  id: updatedTask.id,
-                  artifact: {
-                    parts: artifact.parts,
-                    index: artifact.index,
-                    append: false,
-                  },
-                })}\n\n`
-              );
-            });
-          }
-
-          // If task is in final state, clean up listener
-          if (
-            updatedTask.status.state === TaskState.COMPLETED ||
-            updatedTask.status.state === TaskState.CANCELLED ||
-            updatedTask.status.state === TaskState.FAILED
-          ) {
-            this.taskStore.removeStatusListener(statusListener);
-          }
-        }
-      };
-
-      // Register the status listener
-      this.taskStore.addStatusListener(statusListener);
-
-      // Handle client disconnect
-      req.on("close", () => {
-        this.taskStore.removeStatusListener(statusListener);
-      });
+      // Set up streaming connection
+      this.streamingService.subscribe(task.id, res);
 
       // Enqueue the task for processing
       await this.taskQueue.enqueueTask(task);
