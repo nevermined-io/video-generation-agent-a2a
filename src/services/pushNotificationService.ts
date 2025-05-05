@@ -36,7 +36,7 @@ export class PushNotificationService {
     res: Response,
     config: PushNotificationConfig
   ): void {
-    // Si no se especifican eventTypes, suscribimos a todos los eventos
+    // If no eventTypes are specified, subscribe to all events
     if (!config.eventTypes || config.eventTypes.length === 0) {
       config.eventTypes = [
         PushNotificationEventType.STATUS_UPDATE,
@@ -45,7 +45,7 @@ export class PushNotificationService {
         PushNotificationEventType.COMPLETION,
       ];
     } else {
-      // Convertir strings a PushNotificationEventType si vienen de query
+      // Convert strings to PushNotificationEventType if they come from query
       config.eventTypes = config.eventTypes.map((type: any) =>
         typeof type === "string"
           ? PushNotificationEventType[
@@ -86,7 +86,7 @@ export class PushNotificationService {
     taskId: string,
     config: PushNotificationConfig
   ): Promise<void> {
-    // Si no se especifican eventTypes, suscribimos a todos los eventos
+    // If no eventTypes are specified, subscribe to all events
     if (!config.eventTypes || config.eventTypes.length === 0) {
       config.eventTypes = [
         PushNotificationEventType.STATUS_UPDATE,
@@ -127,17 +127,19 @@ export class PushNotificationService {
     const connections = this.connections.get(taskId);
     const config = this.subscriptions.get(taskId);
 
-    if (!connections || !config) {
+    if (!config) {
       return;
     }
 
     // Only send if client is subscribed to this event type
     if (config.eventTypes.includes(event.type)) {
-      connections.forEach((res) => {
-        this.sendEventToClient(res, event);
-      });
-
-      // If webhook URL is configured, send notification there too
+      // Send to all SSE connections if any
+      if (connections) {
+        connections.forEach((res) => {
+          this.sendEventToClient(res, event);
+        });
+      }
+      // Always send to webhook if configured
       if (config.webhookUrl) {
         this.sendWebhookNotification(config.webhookUrl, event);
       }

@@ -23,7 +23,7 @@ const controller = new A2AController({
 router.get("/health", controller.healthCheck);
 
 // Agent information
-router.get("/agent", controller.getAgentCard);
+router.get("/.well-known/agent.json", controller.getAgentCard);
 
 // Task management
 router.get("/tasks", controller.listTasks);
