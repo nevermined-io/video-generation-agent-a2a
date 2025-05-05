@@ -25,49 +25,78 @@ export class PushNotificationService {
   }
 
   /**
-   * @method subscribe
-   * @description Subscribe a client to push notifications for a task
+   * @method subscribeSSE
+   * @description Subscribe a client to SSE notifications for a task
    * @param {string} taskId - The task ID to subscribe to
    * @param {Response} res - The Express response object for SSE
    * @param {PushNotificationConfig} config - Notification configuration
    */
-  public subscribe(
+  public subscribeSSE(
     taskId: string,
     res: Response,
     config: PushNotificationConfig
   ): void {
-    // Set SSE headers
+    // Si no se especifican eventTypes, suscribimos a todos los eventos
+    if (!config.eventTypes || config.eventTypes.length === 0) {
+      config.eventTypes = [
+        PushNotificationEventType.STATUS_UPDATE,
+        PushNotificationEventType.ARTIFACT_CREATED,
+        PushNotificationEventType.ERROR,
+        PushNotificationEventType.COMPLETION,
+      ];
+    } else {
+      // Convertir strings a PushNotificationEventType si vienen de query
+      config.eventTypes = config.eventTypes.map((type: any) =>
+        typeof type === "string"
+          ? PushNotificationEventType[
+              type.toUpperCase() as keyof typeof PushNotificationEventType
+            ] || type
+          : type
+      );
+    }
+    this.subscriptions.set(taskId, config);
+    if (!this.connections.has(taskId)) {
+      this.connections.set(taskId, new Set());
+    }
+    this.connections.get(taskId)?.add(res);
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
     });
-
-    // Initialize connection set for this task if it doesn't exist
-    if (!this.connections.has(taskId)) {
-      this.connections.set(taskId, new Set());
-    }
-
-    // Add this connection to the set
-    this.connections.get(taskId)?.add(res);
-
-    // Store subscription config
-    this.subscriptions.set(taskId, config);
-
-    // Send initial connection confirmation
     this.sendEventToClient(res, {
       type: PushNotificationEventType.STATUS_UPDATE,
       taskId,
       timestamp: new Date().toISOString(),
       data: { status: "connected" },
     });
-
-    Logger.info(`Client subscribed to notifications for task ${taskId}`);
-
-    // Handle client disconnect
+    Logger.info(`Client subscribed to SSE notifications for task ${taskId}`);
     res.on("close", () => {
       this.unsubscribe(taskId, res);
     });
+  }
+
+  /**
+   * @method subscribeWebhook
+   * @description Register a webhook for push notifications for a task
+   * @param {string} taskId - The task ID to subscribe to
+   * @param {PushNotificationConfig} config - Notification configuration
+   */
+  public async subscribeWebhook(
+    taskId: string,
+    config: PushNotificationConfig
+  ): Promise<void> {
+    // Si no se especifican eventTypes, suscribimos a todos los eventos
+    if (!config.eventTypes || config.eventTypes.length === 0) {
+      config.eventTypes = [
+        PushNotificationEventType.STATUS_UPDATE,
+        PushNotificationEventType.ARTIFACT_CREATED,
+        PushNotificationEventType.ERROR,
+        PushNotificationEventType.COMPLETION,
+      ];
+    }
+    this.subscriptions.set(taskId, config);
+    Logger.info(`Webhook configured for task ${taskId}: ${config.webhookUrl}`);
   }
 
   /**

@@ -44,6 +44,7 @@ export class TaskStore {
    */
   private async notifyStatusListeners(task: Task): Promise<void> {
     try {
+      console.log("Notifying status listeners about task", task);
       const listeners = Array.from(this.statusListeners);
       await Promise.all(listeners.map((listener) => listener(task)));
     } catch (error) {

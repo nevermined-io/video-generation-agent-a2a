@@ -36,8 +36,8 @@ app.post("/tasks/send", a2aController.sendTask);
 app.post("/tasks/sendSubscribe", a2aController.sendTaskSubscribe);
 app.get("/tasks/:taskId", a2aController.getTaskStatus);
 app.get("/tasks/:taskId/history", a2aController.getTaskHistory);
-app.post("/tasks/:taskId/notifications", a2aController.setPushNotification);
-app.get("/tasks/:taskId/notifications", a2aController.getPushNotification);
+app.post("/tasks/:taskId/notifications", a2aController.subscribeWebhook);
+app.get("/tasks/:taskId/notifications", a2aController.subscribeSSE);
 
 // Error handling middleware
 app.use(

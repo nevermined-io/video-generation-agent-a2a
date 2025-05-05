@@ -171,9 +171,9 @@ describe("SongGenerationController", () => {
     });
 
     it("should handle cancellation during song generation", async () => {
-      // Configurar el mock para devolver false en la primera llamada y true en la segunda
+      // Configure the mock to return false in the first call and true in the second
       (mockContext.isCancelled as jest.Mock).mockImplementation(() => {
-        // Simular que la tarea se cancela durante la generación del audio
+        // Simulate task cancellation during audio generation
         if (mockSunoClient.generateSong.mock.calls.length > 0) {
           return true;
         }

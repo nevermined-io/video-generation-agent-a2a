@@ -157,7 +157,7 @@ export class A2AController {
     res.json({
       name: "Song Generation Agent",
       description:
-        "AI agent that generates songs based on text prompts, using AI models to create lyrics and melodies",
+        "AI agent that generates songs based on text prompts, using AI models to create lyrics and melodies. Supports real-time updates via SSE (streaming) and push notifications via webhook.",
       url: "http://localhost:8000",
       provider: {
         organization: "Nevermined",
@@ -167,11 +167,44 @@ export class A2AController {
       documentationUrl: "https://docs.nevermined.io/agents/song-generation",
       capabilities: {
         streaming: true,
-        pushNotifications: false,
+        pushNotifications: true,
         stateTransitionHistory: true,
       },
       defaultInputModes: ["text/plain", "application/json"],
       defaultOutputModes: ["application/json", "audio/mpeg", "text/plain"],
+      notificationEvents: [
+        {
+          type: "status_update",
+          description:
+            "Task status update. Data includes { status: TaskStatus, artifacts: TaskArtifact[] }",
+        },
+        {
+          type: "completion",
+          description:
+            "Task completed/cancelled/failed. Data includes { finalStatus: TaskStatus, artifacts: TaskArtifact[] }",
+        },
+        {
+          type: "artifact_created",
+          description:
+            "(Planned) New artifact created. Data includes { artifact: TaskArtifact }",
+        },
+        {
+          type: "error",
+          description: "Error event. Data includes { error: string }",
+        },
+      ],
+      artifactStructure: {
+        parts: [
+          {
+            type: "audio | text",
+            text: "string (only for text parts)",
+            audioUrl: "string (only for audio parts)",
+          },
+        ],
+        metadata: "object (optional, song metadata: title, tags, duration)",
+        index: "number (artifact order)",
+        append: "boolean (optional, if the artifact is incremental)",
+      },
       skills: [
         {
           id: "generate-song",
@@ -445,8 +478,8 @@ export class A2AController {
       // Create and store the task
       const task = await this.createTask(req.body.prompt, req.body.sessionId);
 
-      // Set up streaming connection
-      this.streamingService.subscribe(task.id, res);
+      // Send the task response immediately
+      res.json(task);
 
       // Enqueue the task for processing
       await this.taskQueue.enqueueTask(task);
@@ -481,62 +514,83 @@ export class A2AController {
   };
 
   /**
-   * @method setPushNotification
-   * @description Set up push notifications for a task
+   * @method subscribeSSE
+   * @description Subscribe a client to SSE notifications for a task
    */
-  public setPushNotification = async (
+  public subscribeSSE = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const taskId = req.params.taskId;
+      const config: PushNotificationConfig = {
+        taskId,
+        eventTypes: req.query.eventTypes
+          ? ((req.query.eventTypes as string)
+              .split(",")
+              .map((type) => type.toLowerCase())
+              .map((type) => {
+                switch (type) {
+                  case "status_update":
+                    return PushNotificationEventType.STATUS_UPDATE;
+                  case "artifact_created":
+                    return PushNotificationEventType.ARTIFACT_CREATED;
+                  case "error":
+                    return PushNotificationEventType.ERROR;
+                  case "completion":
+                    return PushNotificationEventType.COMPLETION;
+                  default:
+                    return undefined;
+                }
+              })
+              .filter((t) => t !== undefined) as PushNotificationEventType[])
+          : [],
+      };
+      const task = await this.getTask(taskId);
+      if (!task) {
+        res.status(404).json({ error: "Task not found" });
+        return;
+      }
+      this.pushNotificationService.subscribeSSE(taskId, res, config);
+    } catch (error) {
+      Logger.error(
+        `Error setting up SSE subscription: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+      if (!res.headersSent) {
+        ErrorHandler.handleHttpError(error as Error, res);
+      }
+    }
+  };
+
+  /**
+   * @method subscribeWebhook
+   * @description Register a webhook for push notifications for a task
+   */
+  public subscribeWebhook = async (
     req: Request,
     res: Response
   ): Promise<void> => {
     try {
       const taskId = req.params.taskId;
       const config: PushNotificationConfig = req.body;
-
       const task = await this.getTask(taskId);
       if (!task) {
         res.status(404).json({ error: "Task not found" });
         return;
       }
-
-      // If SSE is requested, set up the connection
-      if (req.headers.accept === "text/event-stream") {
-        this.pushNotificationService.subscribe(taskId, res, config);
-      } else {
-        // For webhook setup, just store the config and return success
-        this.pushNotificationService.subscribe(taskId, res, config);
-        res.json({
-          success: true,
-          message: "Push notification webhook configured",
-        });
-      }
+      await this.pushNotificationService.subscribeWebhook(taskId, config);
+      res.json({
+        success: true,
+        message: "Push notification webhook configured",
+      });
     } catch (error) {
       Logger.error(
-        `Error setting up push notification: ${
+        `Error setting up webhook: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
       );
-      ErrorHandler.handleHttpError(error as Error, res);
-    }
-  };
-
-  /**
-   * @method getPushNotification
-   * @description Get push notification settings for a task
-   */
-  public getPushNotification = async (
-    req: Request,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const task = await this.getTask(req.params.taskId);
-      if (!task) {
-        res.status(404).json({ error: "Task not found" });
-        return;
+      if (!res.headersSent) {
+        ErrorHandler.handleHttpError(error as Error, res);
       }
-      // Add get push notification logic here
-      res.json({ enabled: false }); // Default response
-    } catch (error) {
-      ErrorHandler.handleHttpError(error as Error, res);
     }
   };
 

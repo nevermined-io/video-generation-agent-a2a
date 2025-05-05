@@ -131,7 +131,7 @@ describe("Song Generation E2E", () => {
         // Verify OpenAI metadata response
         if (
           messageText.includes("Generated metadata") ||
-          messageText.includes("Voyagers Beyond") || // Detectar el título generado
+          messageText.includes("Voyagers Beyond") || // Detect the generated title
           (update.message?.parts[0].text &&
             update.message.parts[0].text.includes("{") &&
             update.message.parts[0].text.includes("title"))

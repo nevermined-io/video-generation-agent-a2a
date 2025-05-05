@@ -693,31 +693,19 @@ describe("A2AController", () => {
   describe("Task Subscription", () => {
     let mockReq: Partial<Request>;
     let mockRes: Partial<Response>;
-    let mockWrite: jest.Mock;
-    let mockEnd: jest.Mock;
     let mockTask: Task;
 
     beforeEach(() => {
-      mockWrite = jest.fn();
-      mockEnd = jest.fn();
-
       mockReq = {
         body: {
           prompt: "test prompt",
           sessionId: "test-session",
         },
-        on: jest.fn().mockImplementation((event, handler) => {
-          if (event === "close") {
-            // Store handler for testing
-            (mockReq as any).closeHandler = handler;
-          }
-        }),
       };
 
       mockRes = {
-        write: mockWrite,
-        end: mockEnd,
-        setHeader: jest.fn(),
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
       };
 
       mockTask = {
@@ -736,140 +724,26 @@ describe("A2AController", () => {
 
       // Mock taskStore methods
       taskStore.createTask.mockResolvedValue(mockTask);
-      taskStore.addStatusListener.mockImplementation((listener) => {
-        (taskStore as any).listener = listener;
-      });
-      taskStore.removeStatusListener.mockImplementation(() => {
-        (taskStore as any).listener = null;
-      });
+      taskQueue.enqueueTask.mockResolvedValue(undefined);
     });
 
-    it("should set up SSE headers correctly", async () => {
+    it("should create and return task immediately", async () => {
       await controller.sendTaskSubscribe(
         mockReq as Request,
         mockRes as Response
       );
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith(
-        "Content-Type",
-        "text/event-stream"
-      );
-      expect(mockRes.setHeader).toHaveBeenCalledWith(
-        "Cache-Control",
-        "no-cache"
-      );
-      expect(mockRes.setHeader).toHaveBeenCalledWith(
-        "Connection",
-        "keep-alive"
-      );
+      expect(taskStore.createTask).toHaveBeenCalled();
+      expect(mockRes.json).toHaveBeenCalledWith(mockTask);
     });
 
-    it("should send initial task creation event", async () => {
+    it("should enqueue task after sending response", async () => {
       await controller.sendTaskSubscribe(
         mockReq as Request,
         mockRes as Response
       );
 
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining(`"id":"${mockTask.id}"`)
-      );
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining(`"final":false`)
-      );
-    });
-
-    it("should handle task status updates", async () => {
-      await controller.sendTaskSubscribe(
-        mockReq as Request,
-        mockRes as Response
-      );
-
-      const updatedTask = {
-        ...mockTask,
-        status: {
-          state: TaskState.WORKING,
-          timestamp: new Date().toISOString(),
-          message: {
-            role: "agent",
-            parts: [{ type: "text", text: "Processing..." }],
-          },
-        },
-      };
-
-      // Simulate task update
-      await (taskStore as any).listener(updatedTask);
-
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining(`"state":"${TaskState.WORKING}"`)
-      );
-    });
-
-    it("should send artifacts when available", async () => {
-      await controller.sendTaskSubscribe(
-        mockReq as Request,
-        mockRes as Response
-      );
-
-      const taskWithArtifact = {
-        ...mockTask,
-        artifacts: [
-          {
-            parts: [{ type: "text", text: "Generated content" }],
-            index: 0,
-          },
-        ],
-      };
-
-      // Simulate task update with artifact
-      await (taskStore as any).listener(taskWithArtifact);
-
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining(`"artifact"`)
-      );
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining(`"Generated content"`)
-      );
-    });
-
-    it("should clean up listener on task completion", async () => {
-      await controller.sendTaskSubscribe(
-        mockReq as Request,
-        mockRes as Response
-      );
-
-      const completedTask = {
-        ...mockTask,
-        status: {
-          state: TaskState.COMPLETED,
-          timestamp: new Date().toISOString(),
-          message: {
-            role: "agent",
-            parts: [{ type: "text", text: "Song generated successfully" }],
-          },
-        },
-      };
-
-      // Simulate task update
-      await (taskStore as any).listener(completedTask);
-
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining(`"state":"${TaskState.COMPLETED}"`)
-      );
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining(`"final":true`)
-      );
-    });
-
-    it("should clean up listener on client disconnect", async () => {
-      await controller.sendTaskSubscribe(
-        mockReq as Request,
-        mockRes as Response
-      );
-
-      // Simulate client disconnect
-      (mockReq as any).closeHandler();
-
-      expect(taskStore.removeStatusListener).toHaveBeenCalled();
+      expect(taskQueue.enqueueTask).toHaveBeenCalledWith(mockTask);
     });
 
     it("should handle errors gracefully", async () => {
@@ -881,8 +755,10 @@ describe("A2AController", () => {
         mockRes as Response
       );
 
-      expect(mockRes.write).not.toHaveBeenCalled();
-      expect(taskStore.removeStatusListener).toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Internal server error",
+      });
     });
   });
 });

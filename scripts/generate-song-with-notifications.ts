@@ -7,7 +7,7 @@
 import axios, { AxiosError } from "axios";
 import { spawn } from "child_process";
 import { v4 as uuidv4 } from "uuid";
-import { EventSource, MessageEvent, ErrorEvent } from "undici";
+import EventSource from "eventsource";
 
 // Configuration
 const CONFIG = {
@@ -18,8 +18,14 @@ const CONFIG = {
 
 // Types for SSE messages
 interface TaskNotification {
+  type: string;
+  taskId: string;
+  timestamp: string;
   data: {
-    status?: string;
+    status?: {
+      state: string;
+      timestamp: string;
+    };
     progress?: number;
     error?: string;
     parts?: Array<{
@@ -135,14 +141,6 @@ async function createSongTask(params: {
     );
     console.log("Server response:", response.data);
 
-    // Configure push notifications for this task
-    await axios.post(
-      `${CONFIG.serverUrl}/tasks/${response.data.id}/notifications`,
-      {
-        eventTypes: ["STATUS_UPDATE", "PROGRESS_UPDATE", "ERROR"],
-      }
-    );
-
     return response.data.id;
   } catch (error) {
     if (error instanceof AxiosError) {
@@ -168,28 +166,63 @@ function subscribeToTaskUpdates(taskId: string): Promise<any> {
 
     function connect() {
       const eventSource = new EventSource(
-        `${CONFIG.serverUrl}/tasks/${taskId}/notifications`
+        `${CONFIG.serverUrl}/tasks/${taskId}/notifications`,
+        {
+          headers: {
+            Accept: "text/event-stream",
+          },
+        }
       );
 
       eventSource.onopen = () => {
         console.log("SSE connection established");
+        reconnectAttempts = 0;
       };
 
-      eventSource.onmessage = (event: MessageEvent) => {
+      eventSource.onmessage = (event) => {
         try {
-          const message = JSON.parse(event.data) as TaskNotification;
+          const notification = JSON.parse(event.data) as TaskNotification;
+          console.log("Received notification:", notification);
 
           // Handle progress updates
-          if (message.data?.progress && message.data.progress > lastProgress) {
-            lastProgress = message.data.progress;
-            console.log(`Progress: ${message.data.progress}%`);
+          if (notification.data?.status?.state) {
+            console.log(`Status: ${notification.data.status.state}`);
+
+            // Check for completion or error states
+            if (
+              ["COMPLETED", "FAILED", "CANCELLED"].includes(
+                notification.data.status.state
+              )
+            ) {
+              eventSource.close();
+              if (notification.data.status.state === "COMPLETED") {
+                resolve(notification.data);
+              } else {
+                reject(
+                  new Error(
+                    `Task ${notification.data.status.state.toLowerCase()}: ${
+                      notification.data.error || "Unknown error"
+                    }`
+                  )
+                );
+              }
+            }
+          }
+
+          // Handle progress updates
+          if (
+            notification.data?.progress &&
+            notification.data.progress > lastProgress
+          ) {
+            lastProgress = notification.data.progress;
+            console.log(`Progress: ${notification.data.progress}%`);
           }
 
           // Handle message updates
-          if (message.data?.parts) {
-            const currentMessage = message.data.parts
-              .filter((part: any) => part.type === "text")
-              .map((part: any) => part.text)
+          if (notification.data?.parts) {
+            const currentMessage = notification.data.parts
+              .filter((part) => part.type === "text")
+              .map((part) => part.text)
               .join("\n");
 
             if (currentMessage && currentMessage !== lastMessage) {
@@ -198,59 +231,27 @@ function subscribeToTaskUpdates(taskId: string): Promise<any> {
             }
           }
 
-          // Handle task completion
-          if (message.data?.status === "completed") {
-            console.log("Song generation completed successfully!");
-
-            const audioArtifact = message.data.artifacts?.find(
-              (artifact: any) =>
-                artifact.parts?.some((part: any) => part.type === "audio")
-            );
-
-            eventSource.close();
-            if (audioArtifact) {
-              const audioPart = audioArtifact.parts.find(
-                (part: any) => part.type === "audio"
-              );
-              const metadataPart = audioArtifact.parts.find(
-                (part: any) => part.type === "text"
-              );
-
-              resolve({
-                status: "completed",
-                audioUrl: audioPart?.audioUrl,
-                metadata: metadataPart?.text
-                  ? JSON.parse(metadataPart.text)
-                  : null,
-                artifacts: message.data.artifacts,
-              });
-            } else {
-              resolve(message.data.result);
-            }
-          } else if (message.data?.status === "failed") {
-            eventSource.close();
-            reject(new Error(`Song generation failed: ${message.data.error}`));
-          } else if (message.data?.status === "cancelled") {
-            eventSource.close();
-            reject(new Error("Song generation was cancelled"));
+          // Handle artifacts
+          if (notification.data?.artifacts) {
+            console.log("Received artifacts:", notification.data.artifacts);
           }
         } catch (error) {
-          console.error("Error processing SSE message:", error);
+          console.error("Error parsing SSE message:", error);
         }
       };
 
-      eventSource.onerror = (error: ErrorEvent) => {
-        console.error("SSE error:", error);
+      eventSource.onerror = (event) => {
+        console.error("SSE connection error:", event);
         eventSource.close();
 
         if (reconnectAttempts < CONFIG.maxConnectionAttempts) {
           reconnectAttempts++;
           console.log(
-            `Attempting to reconnect (${reconnectAttempts}/${CONFIG.maxConnectionAttempts})...`
+            `Reconnecting (attempt ${reconnectAttempts}/${CONFIG.maxConnectionAttempts})...`
           );
           setTimeout(connect, CONFIG.reconnectDelay);
         } else {
-          reject(new Error("Failed to maintain SSE connection"));
+          reject(new Error("Max reconnection attempts reached"));
         }
       };
     }
@@ -260,9 +261,9 @@ function subscribeToTaskUpdates(taskId: string): Promise<any> {
 }
 
 /**
- * Main function to generate a song using SSE notifications
+ * Generates a song with real-time updates via SSE
  * @param {Object} songParams Parameters for song generation
- * @returns {Promise<any>} Generated song data or error
+ * @returns {Promise<any>} The final song generation result
  */
 async function generateSongWithNotifications(songParams: {
   prompt: string;
@@ -270,44 +271,36 @@ async function generateSongWithNotifications(songParams: {
   duration?: number;
 }): Promise<any> {
   try {
-    // Check if server is running
-    const isRunning = await isServerRunning();
-    if (!isRunning) {
+    // Ensure server is running
+    if (!(await isServerRunning())) {
+      console.log("Server not running, attempting to start...");
       await startServer();
     }
 
-    // Create task
-    console.log("Creating song generation task...");
+    // Create task and get updates
     const taskId = await createSongTask(songParams);
     console.log(`Task created with ID: ${taskId}`);
 
-    // Subscribe to task updates via SSE
-    return await subscribeToTaskUpdates(taskId);
+    // Subscribe to updates and wait for completion
+    const result = await subscribeToTaskUpdates(taskId);
+    console.log("Song generation completed:", result);
+    return result;
   } catch (error) {
-    if (error instanceof Error) {
-      console.error("Error generating song:", error.message);
-      throw error;
-    }
-    throw new Error("Unknown error occurred while generating song");
+    console.error("Error in song generation:", error);
+    throw error;
   }
 }
 
-// Example usage
+// Run the script if called directly
 if (require.main === module) {
-  const songParams = {
-    prompt: "Create a happy pop song about summer",
-    style: "pop",
-    duration: 180, // 3 minutes
-  };
-
-  generateSongWithNotifications(songParams)
-    .then((result) => {
-      console.log("Generated song:", result);
-    })
+  const prompt =
+    process.argv[2] || "Create a happy pop song about summer adventures";
+  generateSongWithNotifications({ prompt })
+    .then(() => process.exit(0))
     .catch((error) => {
-      console.error("Failed to generate song:", error.message);
+      console.error("Script failed:", error);
       process.exit(1);
     });
 }
 
-export { generateSongWithNotifications, isServerRunning, startServer };
+export { generateSongWithNotifications };
