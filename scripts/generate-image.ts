@@ -1,7 +1,7 @@
 /**
- * Script to generate a song using the Nevermined agent
+ * Script to generate an image using the Nevermined agent
  * It checks if the server is running, starts it if needed,
- * creates a song generation task and polls for its completion
+ * creates an image generation task and polls for its completion
  */
 
 import axios, { AxiosError } from "axios";
@@ -100,22 +100,23 @@ async function startServer(): Promise<void> {
 }
 
 /**
- * Creates a new song generation task
- * @param {Object} params Song generation parameters
+ * Creates a new image generation task
+ * @param {Object} params Image generation parameters
  * @returns {Promise<string>} Task ID
  */
-async function createSongTask(params: {
+async function createImageTask(params: {
   prompt: string;
   style?: string;
-  duration?: number;
 }): Promise<string> {
   try {
     const taskRequest = {
       prompt: params.prompt,
       sessionId: uuidv4(),
+      taskType: "text2image",
+      // Puedes añadir más parámetros si tu API los soporta
     };
 
-    console.log("Sending task request:", taskRequest);
+    console.log("Sending image task request:", taskRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/send`,
       taskRequest
@@ -131,10 +132,10 @@ async function createSongTask(params: {
         headers: error.config?.headers,
       });
       throw new Error(
-        `Failed to create song generation task: ${error.message}`
+        `Failed to create image generation task: ${error.message}`
       );
     }
-    throw new Error("Failed to create song generation task: Unknown error");
+    throw new Error("Failed to create image generation task: Unknown error");
   }
 }
 
@@ -165,14 +166,13 @@ async function checkTaskStatus(taskId: string): Promise<any> {
 }
 
 /**
- * Main function to generate a song
- * @param {Object} songParams Parameters for song generation
- * @returns {Promise<any>} Generated song data or error
+ * Main function to generate an image
+ * @param {Object} imageParams Parameters for image generation
+ * @returns {Promise<any>} Generated image data or error
  */
-async function generateSong(songParams: {
+async function generateImage(imageParams: {
   prompt: string;
   style?: string;
-  duration?: number;
 }): Promise<any> {
   try {
     // Check if server is running
@@ -182,8 +182,8 @@ async function generateSong(songParams: {
     }
 
     // Create task
-    console.log("Creating song generation task...");
-    const taskId = await createSongTask(songParams);
+    console.log("Creating image generation task...");
+    const taskId = await createImageTask(imageParams);
     console.log(`Task created with ID: ${taskId}`);
 
     // Poll for completion
@@ -213,33 +213,33 @@ async function generateSong(songParams: {
 
       // Check final states
       if (status.status === "completed") {
-        console.log("Song generation completed successfully!");
+        console.log("Image generation completed successfully!");
 
-        // Buscar el artifact de audio en los artifacts devueltos
-        const audioArtifact = status.artifacts?.find((artifact: any) =>
-          artifact.parts?.some((part: any) => part.type === "audio")
+        // Buscar el artifact de imagen en los artifacts devueltos
+        const imageArtifact = status.artifacts?.find((artifact: any) =>
+          artifact.parts?.some((part: any) => part.type === "image")
         );
 
-        if (audioArtifact) {
-          const audioPart = audioArtifact.parts.find(
-            (part: any) => part.type === "audio"
+        if (imageArtifact) {
+          const imagePart = imageArtifact.parts.find(
+            (part: any) => part.type === "image"
           );
-          const metadataPart = audioArtifact.parts.find(
+          const metadataPart = imageArtifact.parts.find(
             (part: any) => part.type === "text"
           );
 
           return {
             status: "completed",
-            audioUrl: audioPart?.audioUrl,
+            imageUrl: imagePart?.url,
             metadata: metadataPart?.text ? JSON.parse(metadataPart.text) : null,
             artifacts: status.artifacts,
           };
         }
         return status.result;
       } else if (status.status === "failed") {
-        throw new Error(`Song generation failed: ${status.error}`);
+        throw new Error(`Image generation failed: ${status.error}`);
       } else if (status.status === "cancelled") {
-        throw new Error("Song generation was cancelled");
+        throw new Error("Image generation was cancelled");
       }
 
       console.log(`Task status: ${status.status}. Waiting...`);
@@ -249,32 +249,31 @@ async function generateSong(songParams: {
       retries++;
     }
 
-    throw new Error("Timeout waiting for song generation");
+    throw new Error("Timeout waiting for image generation");
   } catch (error) {
     if (error instanceof Error) {
-      console.error("Error generating song:", error.message);
+      console.error("Error generating image:", error.message);
       throw error;
     }
-    throw new Error("Unknown error occurred while generating song");
+    throw new Error("Unknown error occurred while generating image");
   }
 }
 
 // Example usage
 if (require.main === module) {
-  const songParams = {
-    prompt: "Create a happy pop song about summer",
-    style: "pop",
-    duration: 180, // 3 minutes
+  const imageParams = {
+    prompt: "A futuristic cityscape at sunset, highly detailed, digital art",
+    style: "digital art",
   };
 
-  generateSong(songParams)
+  generateImage(imageParams)
     .then((result) => {
-      console.log("Generated song:", result);
+      console.log("Generated image:", result);
     })
     .catch((error) => {
-      console.error("Failed to generate song:", error.message);
+      console.error("Failed to generate image:", error.message);
       process.exit(1);
     });
 }
 
-export { generateSong, isServerRunning, startServer };
+export { generateImage, isServerRunning, startServer };

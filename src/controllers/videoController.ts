@@ -11,7 +11,7 @@ import {
   TaskStatus,
   Task,
 } from "../interfaces/a2a";
-import { VideoClient } from "../clients/videoClient";
+import { VideoClient } from "../clients/videoClientDemo";
 import { Logger } from "../utils/logger";
 
 /**

@@ -13,33 +13,18 @@ import {
   TaskContext,
 } from "../../../src/interfaces/a2a";
 import { Logger } from "../../../src/utils/logger";
-import { SongGenerationController } from "../../../src/controllers/songController";
+import { ImageGenerationController } from "../../../src/controllers/imageController";
+import { VideoGenerationController } from "../../../src/controllers/videoController";
 
 // Mock Logger
 jest.mock("../../../src/utils/logger");
-
-// Mock SongGenerationController
-jest.mock("../../../src/controllers/songController", () => {
-  return {
-    SongGenerationController: jest.fn().mockImplementation(() => ({
-      handleTask: jest.fn().mockImplementation(async function* () {
-        yield {
-          state: TaskState.COMPLETED,
-          message: {
-            role: "agent",
-            parts: [{ type: "text", text: "Song generated successfully" }],
-          },
-        };
-      }),
-    })),
-  };
-});
 
 describe("TaskProcessor", () => {
   let taskProcessor: TaskProcessor;
   let taskStore: TaskStore;
   let mockTask: Task;
-  let songController: jest.Mocked<SongGenerationController>;
+  let imageController: jest.Mocked<ImageGenerationController>;
+  let videoController: jest.Mocked<VideoGenerationController>;
 
   beforeEach(() => {
     // Clear all mocks
@@ -48,14 +33,35 @@ describe("TaskProcessor", () => {
     // Create mock task store
     taskStore = new TaskStore();
 
-    // Create mock song controller with required API keys
-    songController = new SongGenerationController(
-      "test-openai-key",
-      "test-suno-key"
-    ) as jest.Mocked<SongGenerationController>;
+    // Create mock image and video controllers
+    imageController = {
+      handleTask: jest.fn().mockImplementation(async function* () {
+        yield {
+          state: TaskState.COMPLETED,
+          message: {
+            role: "agent",
+            parts: [
+              {
+                type: "text",
+                text: "Task completed successfully",
+              },
+            ],
+          },
+        };
+      }),
+    } as unknown as jest.Mocked<ImageGenerationController>;
+    videoController = {
+      handleTask: jest.fn().mockImplementation(async function* () {
+        yield { state: TaskState.COMPLETED };
+      }),
+    } as unknown as jest.Mocked<VideoGenerationController>;
 
     // Create task processor instance
-    taskProcessor = new TaskProcessor(taskStore, songController);
+    taskProcessor = new TaskProcessor(
+      taskStore,
+      imageController,
+      videoController
+    );
 
     // Create mock task
     mockTask = {
@@ -74,6 +80,7 @@ describe("TaskProcessor", () => {
           },
         ],
       },
+      taskType: "text2image",
     };
   });
 
@@ -103,6 +110,7 @@ describe("TaskProcessor", () => {
           role: "user" as const,
           parts: [],
         },
+        taskType: "text2image",
       };
 
       // Create the task first
@@ -125,6 +133,7 @@ describe("TaskProcessor", () => {
             },
           ],
         },
+        taskType: "text2image",
       };
 
       // Create the task first
@@ -157,7 +166,7 @@ describe("TaskProcessor", () => {
       await taskStore.createTask(mockTask);
 
       // Mock songController.handleTask to throw error
-      songController.handleTask.mockImplementationOnce(async function* () {
+      imageController.handleTask.mockImplementationOnce(async function* () {
         throw new Error("Processing failed");
       });
 

@@ -108,6 +108,10 @@ export interface Task {
   artifacts?: TaskArtifact[];
   history?: TaskHistoryEntry[];
   message?: Message;
+  /**
+   * @property {string} [taskType] - Type of the task (e.g., text2image, image2image, text2video)
+   */
+  taskType?: string;
 }
 
 /**

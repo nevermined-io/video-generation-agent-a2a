@@ -38,7 +38,11 @@ describe("PushNotificationService", () => {
 
   describe("subscribe", () => {
     it("should set up SSE headers correctly", () => {
-      service.subscribe("test-task-id", mockResponse as Response, mockConfig);
+      service.subscribeSSE(
+        "test-task-id",
+        mockResponse as Response,
+        mockConfig
+      );
 
       expect(mockResponse.writeHead).toHaveBeenCalledWith(200, {
         "Content-Type": "text/event-stream",
@@ -48,7 +52,11 @@ describe("PushNotificationService", () => {
     });
 
     it("should send initial connection event", () => {
-      service.subscribe("test-task-id", mockResponse as Response, mockConfig);
+      service.subscribeSSE(
+        "test-task-id",
+        mockResponse as Response,
+        mockConfig
+      );
 
       expect(mockResponse.write).toHaveBeenCalledWith(
         expect.stringContaining('"type":"status_update"')
@@ -59,7 +67,11 @@ describe("PushNotificationService", () => {
     });
 
     it("should set up disconnect handler", () => {
-      service.subscribe("test-task-id", mockResponse as Response, mockConfig);
+      service.subscribeSSE(
+        "test-task-id",
+        mockResponse as Response,
+        mockConfig
+      );
 
       expect(mockResponse.on).toHaveBeenCalledWith(
         "close",
@@ -71,7 +83,11 @@ describe("PushNotificationService", () => {
   describe("notify", () => {
     it("should send notifications to subscribed clients", () => {
       // Subscribe a client
-      service.subscribe("test-task-id", mockResponse as Response, mockConfig);
+      service.subscribeSSE(
+        "test-task-id",
+        mockResponse as Response,
+        mockConfig
+      );
 
       // Clear the mock calls from the initial connection message
       (mockResponse.write as jest.Mock).mockClear();
@@ -102,7 +118,7 @@ describe("PushNotificationService", () => {
         eventTypes: [PushNotificationEventType.COMPLETION],
       };
 
-      service.subscribe(
+      service.subscribeSSE(
         "test-task-id",
         mockResponse as Response,
         limitedConfig
@@ -134,11 +150,7 @@ describe("PushNotificationService", () => {
         webhookUrl: "http://test-webhook.com",
       };
 
-      service.subscribe(
-        "test-task-id",
-        mockResponse as Response,
-        configWithWebhook
-      );
+      service.subscribeWebhook("test-task-id", configWithWebhook);
 
       // Clear the mock calls from the initial connection message
       (mockResponse.write as jest.Mock).mockClear();
@@ -165,7 +177,11 @@ describe("PushNotificationService", () => {
 
   describe("unsubscribe", () => {
     it("should remove client from connections", () => {
-      service.subscribe("test-task-id", mockResponse as Response, mockConfig);
+      service.subscribeSSE(
+        "test-task-id",
+        mockResponse as Response,
+        mockConfig
+      );
 
       // Clear the mock calls from the initial connection message
       (mockResponse.write as jest.Mock).mockClear();

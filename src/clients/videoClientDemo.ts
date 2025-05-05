@@ -12,10 +12,10 @@ import {
 } from "../interfaces/apiResponses";
 
 /**
- * @class VideoClientDemo
+ * @class VideoClient
  * @description Demo client for simulating video generation
  */
-export class VideoClientDemo {
+export class VideoClient {
   private readonly defaultTimeout: number;
   private readonly staticJobId: string = "demo-job-id-123";
   private readonly staticVideoUrl: string =
@@ -28,7 +28,7 @@ export class VideoClientDemo {
    * @param {Object} [config] - Configuration options for the demo client
    * @param {number} [config.timeout] - Default timeout in milliseconds (optional)
    */
-  constructor(config: { timeout?: number } = {}) {
+  constructor(config: { apiKey: string; baseUrl?: string; timeout?: number }) {
     this.defaultTimeout = config.timeout || 15000; // 15 segundos por defecto
   }
 

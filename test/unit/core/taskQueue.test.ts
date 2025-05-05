@@ -9,23 +9,27 @@ import { TaskProcessor } from "../../../src/core/taskProcessor";
 import { Task, TaskState } from "../../../src/interfaces/a2a";
 import { Logger } from "../../../src/utils/logger";
 import { TaskStore } from "../../../src/core/taskStore";
-import { SongGenerationController } from "../../../src/controllers/songController";
+import { ImageGenerationController } from "../../../src/controllers/imageController";
+import { VideoGenerationController } from "../../../src/controllers/videoController";
 
 // Mock dependencies
 jest.mock("../../../src/utils/logger");
 jest.mock("../../../src/core/taskProcessor");
 jest.mock("../../../src/core/taskStore");
-jest.mock("../../../src/controllers/songController", () => {
+jest.mock("../../../src/controllers/imageController", () => {
   return {
-    SongGenerationController: jest.fn().mockImplementation(() => ({
+    ImageGenerationController: jest.fn().mockImplementation(() => ({
       handleTask: jest.fn().mockImplementation(async function* () {
-        yield {
-          state: TaskState.COMPLETED,
-          message: {
-            role: "agent",
-            parts: [{ type: "text", text: "Song generated successfully" }],
-          },
-        };
+        yield { state: TaskState.COMPLETED };
+      }),
+    })),
+  };
+});
+jest.mock("../../../src/controllers/videoController", () => {
+  return {
+    VideoGenerationController: jest.fn().mockImplementation(() => ({
+      handleTask: jest.fn().mockImplementation(async function* () {
+        yield { state: TaskState.COMPLETED };
       }),
     })),
   };
@@ -35,7 +39,8 @@ describe("TaskQueue", () => {
   let taskQueue: TaskQueue;
   let taskProcessor: jest.Mocked<TaskProcessor>;
   let taskStore: jest.Mocked<TaskStore>;
-  let songController: jest.Mocked<SongGenerationController>;
+  let imageController: jest.Mocked<ImageGenerationController>;
+  let videoController: jest.Mocked<VideoGenerationController>;
   let mockTask: Task;
 
   beforeEach(() => {
@@ -45,16 +50,23 @@ describe("TaskQueue", () => {
     // Create mock task store
     taskStore = new TaskStore() as jest.Mocked<TaskStore>;
 
-    // Create mock song controller
-    songController = new SongGenerationController(
-      "test-openai-key",
-      "test-suno-key"
-    ) as jest.Mocked<SongGenerationController>;
+    // Create mock image and video controllers
+    imageController = {
+      handleTask: jest.fn().mockImplementation(async function* () {
+        yield { state: TaskState.COMPLETED };
+      }),
+    } as unknown as jest.Mocked<ImageGenerationController>;
+    videoController = {
+      handleTask: jest.fn().mockImplementation(async function* () {
+        yield { state: TaskState.COMPLETED };
+      }),
+    } as unknown as jest.Mocked<VideoGenerationController>;
 
     // Create mock task processor
     taskProcessor = new TaskProcessor(
       taskStore,
-      songController
+      imageController,
+      videoController
     ) as jest.Mocked<TaskProcessor>;
 
     // Create task queue instance

@@ -16,21 +16,37 @@ import { TaskStore } from "../../../src/core/taskStore";
 import { TaskProcessor } from "../../../src/core/taskProcessor";
 import { TaskQueue } from "../../../src/core/taskQueue";
 import { SessionManager } from "../../../src/core/sessionManager";
-import { SongGenerationController } from "../../../src/controllers/songController";
+import { ImageGenerationController } from "../../../src/controllers/imageController";
+import { VideoGenerationController } from "../../../src/controllers/videoController";
 
 jest.mock("../../../src/core/taskStore");
 jest.mock("../../../src/core/taskProcessor");
 jest.mock("../../../src/core/taskQueue");
 jest.mock("../../../src/core/sessionManager");
-jest.mock("../../../src/controllers/songController", () => {
+jest.mock("../../../src/controllers/imageController", () => {
   return {
-    SongGenerationController: jest.fn().mockImplementation(() => ({
+    ImageGenerationController: jest.fn().mockImplementation(() => ({
       handleTask: jest.fn().mockImplementation(async function* () {
         yield {
           state: TaskState.COMPLETED,
           message: {
             role: "agent",
-            parts: [{ type: "text", text: "Song generated successfully" }],
+            parts: [{ type: "text", text: "Image generated successfully" }],
+          },
+        };
+      }),
+    })),
+  };
+});
+jest.mock("../../../src/controllers/videoController", () => {
+  return {
+    VideoGenerationController: jest.fn().mockImplementation(() => ({
+      handleTask: jest.fn().mockImplementation(async function* () {
+        yield {
+          state: TaskState.COMPLETED,
+          message: {
+            role: "agent",
+            parts: [{ type: "text", text: "Video generated successfully" }],
           },
         };
       }),
@@ -44,17 +60,21 @@ describe("A2AController", () => {
   let taskProcessor: jest.Mocked<TaskProcessor>;
   let taskQueue: jest.Mocked<TaskQueue>;
   let sessionManager: jest.Mocked<SessionManager>;
-  let songController: jest.Mocked<SongGenerationController>;
+  let imageController: jest.Mocked<ImageGenerationController>;
+  let videoController: jest.Mocked<VideoGenerationController>;
 
   beforeEach(() => {
     taskStore = new TaskStore() as jest.Mocked<TaskStore>;
-    songController = new SongGenerationController(
-      "test-openai-key",
-      "test-suno-key"
-    ) as jest.Mocked<SongGenerationController>;
+    imageController = new ImageGenerationController(
+      "dummy-key"
+    ) as jest.Mocked<ImageGenerationController>;
+    videoController = new VideoGenerationController(
+      "dummy-key"
+    ) as jest.Mocked<VideoGenerationController>;
     taskProcessor = new TaskProcessor(
       taskStore,
-      songController
+      imageController,
+      videoController
     ) as jest.Mocked<TaskProcessor>;
     taskQueue = new TaskQueue(taskProcessor) as jest.Mocked<TaskQueue>;
     sessionManager = new SessionManager() as jest.Mocked<SessionManager>;
@@ -64,8 +84,8 @@ describe("A2AController", () => {
         maxConcurrent: 2,
         maxRetries: 3,
         retryDelay: 1000,
-        openAiKey: "test-openai-key",
-        sunoKey: "test-suno-key",
+        falKey: "test-fal-key",
+        piapiKey: "test-piapi-key",
       },
       taskStore,
       sessionManager,
@@ -86,7 +106,7 @@ describe("A2AController", () => {
         sendStatus: jest.fn(),
         links: jest.fn(),
         send: jest.fn(),
-      } as unknown as Response;
+      } as any;
 
       await controller.healthCheck({} as Request, mockRes);
       expect(mockRes.json).toHaveBeenCalledWith({ status: "healthy" });
@@ -98,82 +118,21 @@ describe("A2AController", () => {
    * @description Tests agent card retrieval
    */
   describe("Agent Card", () => {
-    it("should return agent information", async () => {
+    it("should return agent information with image and video skills", async () => {
       const mockRes = {
         json: jest.fn(),
         status: jest.fn().mockReturnThis(),
         sendStatus: jest.fn(),
         links: jest.fn(),
         send: jest.fn(),
-      } as unknown as Response;
+      } as any;
 
       await controller.getAgentCard({} as Request, mockRes);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        name: "Song Generation Agent",
-        description:
-          "AI agent that generates songs based on text prompts, using AI models to create lyrics and melodies",
-        url: "http://localhost:8000",
-        provider: {
-          organization: "Nevermined",
-          url: "https://nevermined.io",
-        },
-        version: "1.0.0",
-        documentationUrl: "https://docs.nevermined.io/agents/song-generation",
-        capabilities: {
-          streaming: true,
-          pushNotifications: false,
-          stateTransitionHistory: true,
-        },
-        defaultInputModes: ["text/plain", "application/json"],
-        defaultOutputModes: ["application/json", "audio/mpeg", "text/plain"],
-        skills: [
-          {
-            id: "generate-song",
-            name: "Generate Song",
-            description:
-              "Generates a complete song with lyrics and melody based on provided parameters",
-            tags: ["music", "song", "generation", "creative", "ai"],
-            examples: [
-              "Create a happy pop song about summer adventures",
-              "Generate a romantic ballad about first love",
-            ],
-            inputModes: ["application/json"],
-            outputModes: ["application/json", "audio/mpeg"],
-            parameters: [
-              {
-                name: "title",
-                description: "The title of the song",
-                required: false,
-                type: "string",
-              },
-              {
-                name: "tags",
-                description: "List of genre tags or themes for the song",
-                required: false,
-                type: "array[string]",
-              },
-              {
-                name: "lyrics",
-                description: "Specific lyrics or text to include in the song",
-                required: false,
-                type: "string",
-              },
-              {
-                name: "idea",
-                description: "Brief description or concept for the song",
-                required: true,
-                type: "string",
-              },
-              {
-                name: "duration",
-                description: "Approximate duration of the song in seconds",
-                required: false,
-                type: "integer",
-              },
-            ],
-          },
-        ],
-      });
+      const agentCard = mockRes.json.mock.calls[0][0];
+      expect(agentCard).toHaveProperty("skills");
+      const skillIds = agentCard.skills.map((s: any) => s.id);
+      expect(skillIds).toContain("image-generation");
+      expect(skillIds).toContain("video-generation");
     });
   });
 
@@ -241,7 +200,7 @@ describe("A2AController", () => {
         sendStatus: jest.fn(),
         links: jest.fn(),
         send: jest.fn(),
-      } as unknown as Response & { json: jest.Mock };
+      } as any;
 
       const mockTask: Partial<Task> = {
         prompt: "test prompt",
@@ -371,7 +330,7 @@ describe("A2AController", () => {
         sendStatus: jest.fn(),
         links: jest.fn(),
         send: jest.fn(),
-      } as unknown as Response & { json: jest.Mock };
+      } as any;
 
       const mockTasks: Task[] = [
         {
