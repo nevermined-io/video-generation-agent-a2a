@@ -32,8 +32,8 @@ export function validateEnv(): EnvConfig {
     HOST: process.env.HOST || defaultConfig.HOST!,
     NODE_ENV: process.env.NODE_ENV || defaultConfig.NODE_ENV!,
     LOG_LEVEL: process.env.LOG_LEVEL || defaultConfig.LOG_LEVEL!,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
-    SUNO_API_KEY: process.env.SUNO_API_KEY!,
+    FAL_KEY: process.env.FAL_KEY!,
+    PIAPI_KEY: process.env.PIAPI_KEY!,
     MAX_CONCURRENT_TASKS: parseInt(
       process.env.MAX_CONCURRENT_TASKS ||
         defaultConfig.MAX_CONCURRENT_TASKS!.toString(),

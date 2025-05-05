@@ -22,6 +22,8 @@ export interface EnvConfig {
   LOG_LEVEL: string;
   OPENAI_API_KEY: string;
   SUNO_API_KEY: string;
+  FAL_KEY: string;
+  PIAPI_KEY: string;
   MAX_CONCURRENT_TASKS: number;
   MAX_RETRIES: number;
   RETRY_DELAY: number;
@@ -41,13 +43,12 @@ export const defaultConfig: Partial<EnvConfig> = {
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000,
   TASK_TIMEOUT: 300000, // 5 minutes
+  FAL_KEY: "",
+  PIAPI_KEY: "",
 };
 
 /**
  * @constant requiredEnvVars
  * @description List of required environment variables
  */
-export const requiredEnvVars: (keyof EnvConfig)[] = [
-  "OPENAI_API_KEY",
-  "SUNO_API_KEY",
-];
+export const requiredEnvVars: (keyof EnvConfig)[] = ["FAL_KEY", "PIAPI_KEY"];

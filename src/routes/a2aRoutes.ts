@@ -12,8 +12,8 @@ const config = getEnvConfig();
 
 // Initialize controller with config
 const controller = new A2AController({
-  openAiKey: config.OPENAI_API_KEY,
-  sunoKey: config.SUNO_API_KEY,
+  falKey: config.FAL_KEY,
+  piapiKey: config.PIAPI_KEY,
   maxConcurrent: config.MAX_CONCURRENT_TASKS,
   maxRetries: config.MAX_RETRIES,
   retryDelay: config.RETRY_DELAY,

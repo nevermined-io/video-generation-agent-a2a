@@ -1,8 +1,8 @@
 /**
  * @enum {string}
- * @description Enumeration of possible error codes for Suno operations
+ * @description Enumeration of possible error codes for media (image/video) operations
  */
-export enum SunoErrorCode {
+export enum MediaErrorCode {
   INVALID_API_KEY = "INVALID_API_KEY",
   INVALID_REQUEST = "INVALID_REQUEST",
   API_ERROR = "API_ERROR",
@@ -14,24 +14,24 @@ export enum SunoErrorCode {
 }
 
 /**
- * @class SunoError
- * @description Custom error class for Suno-related operations
+ * @class MediaError
+ * @description Custom error class for media-related operations
  * @extends Error
  */
-export class SunoError extends Error {
+export class MediaError extends Error {
   /**
    * @constructor
-   * @param {SunoErrorCode} code - The error code
+   * @param {MediaErrorCode} code - The error code
    * @param {number} status - HTTP status code if applicable
    * @param {string} [details] - Additional error details
    */
   constructor(
-    public readonly code: SunoErrorCode,
+    public readonly code: MediaErrorCode,
     public readonly status: number,
     public readonly details?: string
   ) {
     super(`${code}: ${details || "An error occurred"}`);
-    this.name = "SunoError";
-    Object.setPrototypeOf(this, SunoError.prototype);
+    this.name = "MediaError";
+    Object.setPrototypeOf(this, MediaError.prototype);
   }
 }

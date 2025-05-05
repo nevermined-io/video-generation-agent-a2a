@@ -11,7 +11,6 @@ import { ErrorHandler } from "../core/errorHandler";
 import { TaskProcessor } from "../core/taskProcessor";
 import { TaskQueue } from "../core/taskQueue";
 import { Logger } from "../utils/logger";
-import { SongGenerationController } from "./songController";
 import { PushNotificationService } from "../services/pushNotificationService";
 import { StreamingService } from "../services/streamingService";
 import {
@@ -19,6 +18,8 @@ import {
   PushNotificationEvent,
   PushNotificationEventType,
 } from "../interfaces/a2a";
+import { ImageGenerationController } from "./imageController";
+import { VideoGenerationController } from "./videoController";
 
 /**
  * @interface A2AControllerConfig
@@ -28,8 +29,8 @@ interface A2AControllerConfig {
   maxConcurrent?: number;
   maxRetries?: number;
   retryDelay?: number;
-  openAiKey?: string;
-  sunoKey?: string;
+  falKey?: string;
+  piapiKey?: string;
 }
 
 /**
@@ -52,7 +53,6 @@ export class A2AController {
   private sessionManager: SessionManager;
   private taskProcessor: TaskProcessor;
   private taskQueue: TaskQueue;
-  private songController: SongGenerationController;
   private pushNotificationService: PushNotificationService;
   private streamingService: StreamingService;
 
@@ -71,18 +71,17 @@ export class A2AController {
     taskProcessor?: TaskProcessor,
     taskQueue?: TaskQueue
   ) {
-    if (!config.openAiKey || !config.sunoKey) {
-      throw new Error("OpenAI and Suno API keys are required");
+    if (!config.falKey || !config.piapiKey) {
+      throw new Error("Fal.ai and PiAPI API keys are required");
     }
 
     this.taskStore = taskStore || new TaskStore();
     this.sessionManager = sessionManager || new SessionManager();
-    this.songController = new SongGenerationController(
-      config.openAiKey,
-      config.sunoKey
-    );
+    const imageController = new ImageGenerationController(config.falKey);
+    const videoController = new VideoGenerationController(config.piapiKey);
     this.taskProcessor =
-      taskProcessor || new TaskProcessor(this.taskStore, this.songController);
+      taskProcessor ||
+      new TaskProcessor(this.taskStore, imageController, videoController);
     this.taskQueue =
       taskQueue ||
       new TaskQueue(this.taskProcessor, {
@@ -155,99 +154,117 @@ export class A2AController {
    */
   public getAgentCard = async (req: Request, res: Response): Promise<void> => {
     res.json({
-      name: "Song Generation Agent",
+      name: "Image & Video Generation Agent",
       description:
-        "AI agent that generates songs based on text prompts, using AI models to create lyrics and melodies. Supports real-time updates via SSE (streaming) and push notifications via webhook.",
+        "AI agent that generates images and videos from text prompts, using advanced AI models. Supports real-time updates (streaming) and push notifications.",
       url: "http://localhost:8000",
       provider: {
         organization: "Nevermined",
         url: "https://nevermined.io",
       },
-      version: "1.0.0",
-      documentationUrl: "https://docs.nevermined.io/agents/song-generation",
+      version: "2.0.0",
+      documentationUrl:
+        "https://docs.nevermined.io/agents/image-video-generation",
       capabilities: {
         streaming: true,
         pushNotifications: true,
         stateTransitionHistory: true,
       },
       defaultInputModes: ["text/plain", "application/json"],
-      defaultOutputModes: ["application/json", "audio/mpeg", "text/plain"],
+      defaultOutputModes: [
+        "application/json",
+        "image/png",
+        "video/mp4",
+        "text/plain",
+      ],
       notificationEvents: [
         {
           type: "status_update",
           description:
-            "Task status update. Data includes { status: TaskStatus, artifacts: TaskArtifact[] }",
+            "Task status update. Includes { status: TaskStatus, artifacts: TaskArtifact[] }",
         },
         {
           type: "completion",
           description:
-            "Task completed/cancelled/failed. Data includes { finalStatus: TaskStatus, artifacts: TaskArtifact[] }",
+            "Task completed/cancelled/failed. Includes { finalStatus: TaskStatus, artifacts: TaskArtifact[] }",
         },
         {
           type: "artifact_created",
           description:
-            "(Planned) New artifact created. Data includes { artifact: TaskArtifact }",
+            "(Planned) New artifact created. Includes { artifact: TaskArtifact }",
         },
         {
           type: "error",
-          description: "Error event. Data includes { error: string }",
+          description: "Error event. Includes { error: string }",
         },
       ],
-      artifactStructure: {
-        parts: [
-          {
-            type: "audio | text",
-            text: "string (only for text parts)",
-            audioUrl: "string (only for audio parts)",
-          },
-        ],
-        metadata: "object (optional, song metadata: title, tags, duration)",
-        index: "number (artifact order)",
-        append: "boolean (optional, if the artifact is incremental)",
-      },
       skills: [
         {
-          id: "generate-song",
-          name: "Generate Song",
+          id: "image-generation",
+          name: "Image Generation",
           description:
-            "Generates a complete song with lyrics and melody based on provided parameters",
-          tags: ["music", "song", "generation", "creative", "ai"],
-          examples: [
-            "Create a happy pop song about summer adventures",
-            "Generate a romantic ballad about first love",
-          ],
-          inputModes: ["application/json"],
-          outputModes: ["application/json", "audio/mpeg"],
+            "Generates an image from a text prompt (and optionally an input image)",
+          tags: ["image", "generation", "ai"],
+          inputModes: ["text/plain", "application/json"],
+          outputModes: ["image/png", "application/json"],
           parameters: [
             {
-              name: "title",
-              description: "The title of the song",
-              required: false,
+              name: "taskType",
+              description:
+                "Type of image generation task. Must be 'text2image' or 'image2image' (required)",
+              required: true,
               type: "string",
+              enum: ["text2image", "image2image"],
             },
             {
-              name: "tags",
-              description: "List of genre tags or themes for the song",
-              required: false,
-              type: "array[string]",
-            },
-            {
-              name: "lyrics",
-              description: "Specific lyrics or text to include in the song",
-              required: false,
-              type: "string",
-            },
-            {
-              name: "idea",
-              description: "Brief description or concept for the song",
+              name: "prompt",
+              description: "Text prompt for image generation",
               required: true,
               type: "string",
             },
             {
-              name: "duration",
-              description: "Approximate duration of the song in seconds",
+              name: "inputImageUrl",
+              description:
+                "URL of an input image for transformation (required for 'image2image')",
               required: false,
-              type: "integer",
+              type: "string",
+            },
+          ],
+        },
+        {
+          id: "video-generation",
+          name: "Video Generation",
+          description:
+            "Generates a video from a text prompt and one or more reference images",
+          tags: ["video", "generation", "ai"],
+          inputModes: ["text/plain", "application/json"],
+          outputModes: ["video/mp4", "application/json"],
+          parameters: [
+            {
+              name: "taskType",
+              description:
+                "Type of video generation task. Must be 'text2video' (required)",
+              required: true,
+              type: "string",
+              enum: ["text2video"],
+            },
+            {
+              name: "prompt",
+              description: "Text prompt for video generation",
+              required: true,
+              type: "string",
+            },
+            {
+              name: "imageUrls",
+              description: "List of reference image URLs",
+              required: true,
+              type: "string[]",
+            },
+            {
+              name: "duration",
+              description: "Video duration in seconds (5 or 10)",
+              required: false,
+              type: "number",
             },
           ],
         },

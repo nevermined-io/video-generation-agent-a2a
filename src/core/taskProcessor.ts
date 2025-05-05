@@ -12,7 +12,8 @@ import {
 } from "../interfaces/a2a";
 import { TaskStore } from "./taskStore";
 import { Logger } from "../utils/logger";
-import { SongGenerationController } from "../controllers/songController";
+import { ImageGenerationController } from "../controllers/imageController";
+import { VideoGenerationController } from "../controllers/videoController";
 
 /**
  * @class TaskProcessor
@@ -24,11 +25,13 @@ export class TaskProcessor {
   /**
    * @constructor
    * @param {TaskStore} taskStore - Store for task persistence
-   * @param {SongGenerationController} songController - Controller for song generation
+   * @param {ImageGenerationController} imageController - Controller for image generation
+   * @param {VideoGenerationController} videoController - Controller for video generation
    */
   constructor(
     private taskStore: TaskStore,
-    private songController: SongGenerationController
+    private imageController: ImageGenerationController,
+    private videoController: VideoGenerationController
   ) {}
 
   /**
@@ -51,16 +54,29 @@ export class TaskProcessor {
         isCancelled: () => this.isCancelled,
       };
 
-      // Process with song generation controller
-      for await (const update of this.songController.handleTask(context)) {
+      // Route to the correct controller based on taskType
+      const taskType =
+        (task as any).taskType ||
+        task.message?.parts.find(
+          (p: any) => p.type === "text" && p.text?.includes("taskType")
+        )?.text;
+      let controller;
+      if (taskType === "text2image" || taskType === "image2image") {
+        controller = this.imageController;
+      } else if (taskType === "text2video") {
+        controller = this.videoController;
+      } else {
+        throw new Error(
+          "Invalid or missing taskType. Must be one of: text2image, image2image, text2video."
+        );
+      }
+      for await (const update of controller.handleTask(context)) {
         await this.updateTaskStatus(
           task,
           update.state,
           update.message,
           update.artifacts
         );
-
-        // If task is completed or failed, break the loop
         if (
           update.state === TaskState.COMPLETED ||
           update.state === TaskState.FAILED
