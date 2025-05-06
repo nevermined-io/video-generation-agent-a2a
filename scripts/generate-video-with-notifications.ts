@@ -1,7 +1,7 @@
 /**
- * Script to generate an image using the Nevermined agent with SSE notifications
+ * Script to generate a video using the Nevermined agent with SSE notifications
  * Instead of polling, it subscribes to server events to get real-time updates
- * about the image generation progress
+ * about the video generation progress
  */
 
 import axios, { AxiosError } from "axios";
@@ -121,22 +121,25 @@ async function startServer(): Promise<void> {
 }
 
 /**
- * Creates a new image generation task and sets up push notifications
- * @param {Object} params Image generation parameters
+ * Creates a new video generation task and sets up push notifications
+ * @param {Object} params Video generation parameters
  * @returns {Promise<string>} Task ID
  */
-async function createImageTask(params: {
+async function createVideoTask(params: {
   prompt: string;
-  style?: string;
+  duration?: number;
+  imageUrls?: string[];
 }): Promise<string> {
   try {
     const taskRequest = {
       prompt: params.prompt,
       sessionId: uuidv4(),
-      taskType: "text2image",
+      taskType: "text2video",
+      duration: params.duration,
+      imageUrls: params.imageUrls,
     };
 
-    console.log("Sending image task request:", taskRequest);
+    console.log("Sending video task request:", taskRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/sendSubscribe`,
       taskRequest
@@ -148,10 +151,10 @@ async function createImageTask(params: {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);
       throw new Error(
-        `Failed to create image generation task: ${error.message}`
+        `Failed to create video generation task: ${error.message}`
       );
     }
-    throw new Error("Failed to create image generation task: Unknown error");
+    throw new Error("Failed to create video generation task: Unknown error");
   }
 }
 
@@ -198,22 +201,22 @@ function subscribeToTaskUpdates(taskId: string): Promise<any> {
             ) {
               eventSource.close();
               if (notification.data.status.state === "COMPLETED") {
-                // Buscar el artifact de imagen en los artifacts devueltos
-                const imageArtifact = notification.data.artifacts?.find(
+                // Buscar el artifact de video en los artifacts devueltos
+                const videoArtifact = notification.data.artifacts?.find(
                   (artifact: any) =>
-                    artifact.parts?.some((part: any) => part.type === "image")
+                    artifact.parts?.some((part: any) => part.type === "video")
                 );
                 let result = notification.data;
-                if (imageArtifact) {
-                  const imagePart = imageArtifact.parts.find(
-                    (part: any) => part.type === "image"
+                if (videoArtifact) {
+                  const videoPart = videoArtifact.parts.find(
+                    (part: any) => part.type === "video"
                   );
-                  const metadataPart = imageArtifact.parts.find(
+                  const metadataPart = videoArtifact.parts.find(
                     (part: any) => part.type === "text"
                   );
                   result = {
                     ...(notification.data as any),
-                    imageUrl: imagePart?.url,
+                    videoUrl: videoPart?.url,
                     metadata: metadataPart?.text
                       ? JSON.parse(metadataPart.text)
                       : null,
@@ -284,13 +287,14 @@ function subscribeToTaskUpdates(taskId: string): Promise<any> {
 }
 
 /**
- * Generates an image with real-time updates via SSE
- * @param {Object} imageParams Parameters for image generation
- * @returns {Promise<any>} The final image generation result
+ * Generates a video with real-time updates via SSE
+ * @param {Object} videoParams Parameters for video generation
+ * @returns {Promise<any>} The final video generation result
  */
-async function generateImageWithNotifications(imageParams: {
+async function generateVideoWithNotifications(videoParams: {
   prompt: string;
-  style?: string;
+  duration?: number;
+  imageUrls?: string[];
 }): Promise<any> {
   try {
     // Ensure server is running
@@ -300,15 +304,15 @@ async function generateImageWithNotifications(imageParams: {
     }
 
     // Create task and get updates
-    const taskId = await createImageTask(imageParams);
+    const taskId = await createVideoTask(videoParams);
     console.log(`Task created with ID: ${taskId}`);
 
     // Subscribe to updates and wait for completion
     const result = await subscribeToTaskUpdates(taskId);
-    console.log("Image generation completed:", result);
+    console.log("Video generation completed:", result);
     return result;
   } catch (error) {
-    console.error("Error in image generation:", error);
+    console.error("Error in video generation:", error);
     throw error;
   }
 }
@@ -316,9 +320,15 @@ async function generateImageWithNotifications(imageParams: {
 // Run the script if called directly
 if (require.main === module) {
   const prompt =
-    process.argv[2] ||
-    "A futuristic cityscape at sunset, highly detailed, digital art";
-  generateImageWithNotifications({ prompt })
+    process.argv[2] || "A timelapse of a city skyline, cinematic, 10 seconds";
+  generateVideoWithNotifications({
+    prompt,
+    duration: 10,
+    imageUrls: [
+      "https://v3.fal.media/files/zebra/vKRttnrYOu5FuljgFxC7-.png",
+      "https://v3.fal.media/files/monkey/mKJ72b67ckayIuX7Ql1pQ.png",
+    ],
+  })
     .then(() => process.exit(0))
     .catch((error) => {
       console.error("Script failed:", error);
@@ -326,4 +336,4 @@ if (require.main === module) {
     });
 }
 
-export { generateImageWithNotifications };
+export { generateVideoWithNotifications };

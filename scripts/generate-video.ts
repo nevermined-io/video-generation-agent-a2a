@@ -1,7 +1,7 @@
 /**
- * Script to generate an image using the Nevermined agent
+ * Script to generate a video using the Nevermined agent
  * It checks if the server is running, starts it if needed,
- * creates an image generation task and polls for its completion
+ * creates a video generation task and polls for its completion
  */
 
 import axios, { AxiosError } from "axios";
@@ -100,22 +100,25 @@ async function startServer(): Promise<void> {
 }
 
 /**
- * Creates a new image generation task
- * @param {Object} params Image generation parameters
+ * Creates a new video generation task
+ * @param {Object} params Video generation parameters
  * @returns {Promise<string>} Task ID
  */
-async function createImageTask(params: {
+async function createVideoTask(params: {
   prompt: string;
-  style?: string;
+  duration?: number;
+  imageUrls?: string[];
 }): Promise<string> {
   try {
     const taskRequest = {
       prompt: params.prompt,
       sessionId: uuidv4(),
-      taskType: "text2image",
+      taskType: "text2video",
+      duration: params.duration,
+      imageUrls: params.imageUrls,
     };
 
-    console.log("Sending image task request:", taskRequest);
+    console.log("Sending video task request:", taskRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/send`,
       taskRequest
@@ -131,10 +134,10 @@ async function createImageTask(params: {
         headers: error.config?.headers,
       });
       throw new Error(
-        `Failed to create image generation task: ${error.message}`
+        `Failed to create video generation task: ${error.message}`
       );
     }
-    throw new Error("Failed to create image generation task: Unknown error");
+    throw new Error("Failed to create video generation task: Unknown error");
   }
 }
 
@@ -165,13 +168,14 @@ async function checkTaskStatus(taskId: string): Promise<any> {
 }
 
 /**
- * Main function to generate an image
- * @param {Object} imageParams Parameters for image generation
- * @returns {Promise<any>} Generated image data or error
+ * Main function to generate a video
+ * @param {Object} videoParams Parameters for video generation
+ * @returns {Promise<any>} Generated video data or error
  */
-async function generateImage(imageParams: {
+async function generateVideo(videoParams: {
   prompt: string;
-  style?: string;
+  duration?: number;
+  imageUrls?: string[];
 }): Promise<any> {
   try {
     // Check if server is running
@@ -181,8 +185,8 @@ async function generateImage(imageParams: {
     }
 
     // Create task
-    console.log("Creating image generation task...");
-    const taskId = await createImageTask(imageParams);
+    console.log("Creating video generation task...");
+    const taskId = await createVideoTask(videoParams);
     console.log(`Task created with ID: ${taskId}`);
 
     // Poll for completion
@@ -212,33 +216,33 @@ async function generateImage(imageParams: {
 
       // Check final states
       if (status.status === "completed") {
-        console.log("Image generation completed successfully!");
+        console.log("Video generation completed successfully!");
 
-        // Buscar el artifact de imagen en los artifacts devueltos
-        const imageArtifact = status.artifacts?.find((artifact: any) =>
-          artifact.parts?.some((part: any) => part.type === "image")
+        // Buscar el artifact de video en los artifacts devueltos
+        const videoArtifact = status.artifacts?.find((artifact: any) =>
+          artifact.parts?.some((part: any) => part.type === "video")
         );
 
-        if (imageArtifact) {
-          const imagePart = imageArtifact.parts.find(
-            (part: any) => part.type === "image"
+        if (videoArtifact) {
+          const videoPart = videoArtifact.parts.find(
+            (part: any) => part.type === "video"
           );
-          const metadataPart = imageArtifact.parts.find(
+          const metadataPart = videoArtifact.parts.find(
             (part: any) => part.type === "text"
           );
 
           return {
             status: "completed",
-            imageUrl: imagePart?.url,
+            videoUrl: videoPart?.url,
             metadata: metadataPart?.text ? JSON.parse(metadataPart.text) : null,
             artifacts: status.artifacts,
           };
         }
         return status.result;
       } else if (status.status === "failed") {
-        throw new Error(`Image generation failed: ${status.error}`);
+        throw new Error(`Video generation failed: ${status.error}`);
       } else if (status.status === "cancelled") {
-        throw new Error("Image generation was cancelled");
+        throw new Error("Video generation was cancelled");
       }
 
       console.log(`Task status: ${status.status}. Waiting...`);
@@ -248,31 +252,35 @@ async function generateImage(imageParams: {
       retries++;
     }
 
-    throw new Error("Timeout waiting for image generation");
+    throw new Error("Timeout waiting for video generation");
   } catch (error) {
     if (error instanceof Error) {
-      console.error("Error generating image:", error.message);
+      console.error("Error generating video:", error.message);
       throw error;
     }
-    throw new Error("Unknown error occurred while generating image");
+    throw new Error("Unknown error occurred while generating video");
   }
 }
 
 // Example usage
 if (require.main === module) {
-  const imageParams = {
-    prompt: "A futuristic cityscape at sunset, highly detailed, digital art",
-    style: "digital art",
+  const videoParams = {
+    prompt: "A timelapse of a city skyline, cinematic, 10 seconds",
+    duration: 10,
+    imageUrls: [
+      "https://v3.fal.media/files/zebra/vKRttnrYOu5FuljgFxC7-.png",
+      "https://v3.fal.media/files/monkey/mKJ72b67ckayIuX7Ql1pQ.png",
+    ],
   };
 
-  generateImage(imageParams)
+  generateVideo(videoParams)
     .then((result) => {
-      console.log("Generated image:", result);
+      console.log("Generated video:", result);
     })
     .catch((error) => {
-      console.error("Failed to generate image:", error.message);
+      console.error("Failed to generate video:", error.message);
       process.exit(1);
     });
 }
 
-export { generateImage, isServerRunning, startServer };
+export { generateVideo, isServerRunning, startServer };

@@ -1,5 +1,5 @@
 /**
- * Script to generate an image using the Nevermined agent with webhook notifications
+ * Script to generate a video using the Nevermined agent with webhook notifications
  * Instead of SSE, it registers a webhook and receives notifications via HTTP POST
  * @todo Remove the express server after testing
  */
@@ -13,8 +13,8 @@ import { AddressInfo } from "net";
 // Configuration
 const CONFIG = {
   serverUrl: process.env.SERVER_URL || "http://localhost:8000",
-  webhookPort: 4001,
-  webhookPath: "/webhook-test-client",
+  webhookPort: 4002,
+  webhookPath: "/webhook-test-client-video",
   eventTypes: ["status_update", "completion"],
 };
 
@@ -33,19 +33,19 @@ async function startWebhookServer(): Promise<string> {
         "[Webhook Client] Notification received:",
         JSON.stringify(req.body, null, 2)
       );
-      // Si hay artifacts de imagen, muéstralos
+      // Si hay artifacts de video, muéstralos
       if (req.body?.artifacts) {
-        const imageArtifact = req.body.artifacts.find((artifact: any) =>
-          artifact.parts?.some((part: any) => part.type === "image")
+        const videoArtifact = req.body.artifacts.find((artifact: any) =>
+          artifact.parts?.some((part: any) => part.type === "video")
         );
-        if (imageArtifact) {
-          const imagePart = imageArtifact.parts.find(
-            (part: any) => part.type === "image"
+        if (videoArtifact) {
+          const videoPart = videoArtifact.parts.find(
+            (part: any) => part.type === "video"
           );
-          const metadataPart = imageArtifact.parts.find(
+          const metadataPart = videoArtifact.parts.find(
             (part: any) => part.type === "text"
           );
-          console.log("[Webhook Client] Image URL:", imagePart?.url);
+          console.log("[Webhook Client] Video URL:", videoPart?.url);
           if (metadataPart?.text) {
             try {
               console.log(
@@ -74,21 +74,24 @@ async function startWebhookServer(): Promise<string> {
 }
 
 /**
- * Creates a new image generation task
- * @param {Object} params Image generation parameters
+ * Creates a new video generation task
+ * @param {Object} params Video generation parameters
  * @returns {Promise<string>} Task ID
  */
-async function createImageTask(params: {
+async function createVideoTask(params: {
   prompt: string;
-  style?: string;
+  duration?: number;
+  imageUrls?: string[];
 }): Promise<string> {
   try {
     const taskRequest = {
       prompt: params.prompt,
       sessionId: uuidv4(),
-      taskType: "text2image",
+      taskType: "text2video",
+      duration: params.duration,
+      imageUrls: params.imageUrls,
     };
-    console.log("Sending image task request:", taskRequest);
+    console.log("Sending video task request:", taskRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/sendSubscribe`,
       taskRequest
@@ -99,10 +102,10 @@ async function createImageTask(params: {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);
       throw new Error(
-        `Failed to create image generation task: ${error.message}`
+        `Failed to create video generation task: ${error.message}`
       );
     }
-    throw new Error("Failed to create image generation task: Unknown error");
+    throw new Error("Failed to create video generation task: Unknown error");
   }
 }
 
@@ -138,19 +141,20 @@ async function registerWebhook(
 }
 
 /**
- * Main function to generate an image and receive webhook notifications
- * @param {Object} imageParams Parameters for image generation
+ * Main function to generate a video and receive webhook notifications
+ * @param {Object} videoParams Parameters for video generation
  * @returns {Promise<void>}
  */
-async function generateImageWithWebhook(imageParams: {
+async function generateVideoWithWebhook(videoParams: {
   prompt: string;
-  style?: string;
+  duration?: number;
+  imageUrls?: string[];
 }): Promise<void> {
   // Start webhook server
   const webhookUrl = await startWebhookServer();
 
   // Create task
-  const taskId = await createImageTask(imageParams);
+  const taskId = await createVideoTask(videoParams);
   console.log(`Task created with ID: ${taskId}`);
 
   // Register webhook
@@ -162,9 +166,15 @@ async function generateImageWithWebhook(imageParams: {
 // Run the script if called directly
 if (require.main === module) {
   const prompt =
-    process.argv[2] ||
-    "A futuristic cityscape at sunset, highly detailed, digital art";
-  generateImageWithWebhook({ prompt })
+    process.argv[2] || "A timelapse of a city skyline, cinematic, 10 seconds";
+  generateVideoWithWebhook({
+    prompt,
+    duration: 10,
+    imageUrls: [
+      "https://v3.fal.media/files/zebra/vKRttnrYOu5FuljgFxC7-.png",
+      "https://v3.fal.media/files/monkey/mKJ72b67ckayIuX7Ql1pQ.png",
+    ],
+  })
     .then(() => {})
     .catch((error) => {
       console.error("Script failed:", error);
@@ -172,4 +182,4 @@ if (require.main === module) {
     });
 }
 
-export { generateImageWithWebhook };
+export { generateVideoWithWebhook };

@@ -279,7 +279,7 @@ export class A2AController {
   public sendTask = async (req: Request, res: Response): Promise<void> => {
     try {
       Logger.info(`Sending task: ${req.body.prompt}`);
-      const task = await this.createTask(req.body.prompt, req.body.sessionId);
+      const task = await this.createTask(req.body);
       res.json(task);
     } catch (error) {
       if (error instanceof Error) {
@@ -357,24 +357,36 @@ export class A2AController {
    * @method createTask
    * @description Create and enqueue a new task
    */
-  public async createTask(prompt: string, sessionId?: string): Promise<Task> {
+  public async createTask(params: {
+    prompt: string;
+    sessionId?: string;
+    taskType?: string;
+    [key: string]: any;
+  }): Promise<Task> {
     try {
       // Create initial message
       const message: Message = {
         role: "user",
-        parts: [{ type: "text", text: prompt }],
+        parts: [{ type: "text", text: params.prompt }],
       };
 
       // Create new task
       const task: Task = {
         id: crypto.randomUUID(),
-        prompt,
+        prompt: params.prompt,
         status: {
           state: TaskState.SUBMITTED,
           timestamp: new Date().toISOString(),
         },
         message,
-        sessionId,
+        sessionId: params.sessionId,
+        taskType: params.taskType,
+        // Propaga cualquier otro campo relevante, pero omite los ya definidos
+        ...Object.fromEntries(
+          Object.entries(params).filter(
+            ([k]) => !["prompt", "sessionId", "taskType"].includes(k)
+          )
+        ),
       };
 
       // Store task first
@@ -493,7 +505,7 @@ export class A2AController {
   ): Promise<void> => {
     try {
       // Create and store the task
-      const task = await this.createTask(req.body.prompt, req.body.sessionId);
+      const task = await this.createTask(req.body);
 
       // Send the task response immediately
       res.json(task);

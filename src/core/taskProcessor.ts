@@ -55,15 +55,10 @@ export class TaskProcessor {
       };
 
       // Route to the correct controller based on taskType
-      const taskType =
-        (task as any).taskType ||
-        task.message?.parts.find(
-          (p: any) => p.type === "text" && p.text?.includes("taskType")
-        )?.text;
       let controller;
-      if (taskType === "text2image" || taskType === "image2image") {
+      if (task.taskType === "text2image" || task.taskType === "image2image") {
         controller = this.imageController;
-      } else if (taskType === "text2video") {
+      } else if (task.taskType === "text2video") {
         controller = this.videoController;
       } else {
         throw new Error(
@@ -146,6 +141,11 @@ export class TaskProcessor {
 
       if (!currentTask) {
         throw new Error(`Task ${task.id} not found`);
+      }
+
+      // If the state doesn't change, don't update or notify
+      if (currentTask.status?.state === state) {
+        return;
       }
 
       const statusUpdate = {

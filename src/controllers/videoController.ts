@@ -11,7 +11,7 @@ import {
   TaskStatus,
   Task,
 } from "../interfaces/a2a";
-import { VideoClient } from "../clients/videoClientDemo";
+import { VideoClient } from "../clients/videoClient";
 import { Logger } from "../utils/logger";
 
 /**
@@ -141,32 +141,32 @@ export class VideoGenerationController {
         task.prompt ||
         task.message?.parts.find((p) => p.type === "text")?.text ||
         "";
-      // Validar prompt
+      // Validate prompt
       const validationUpdate = this.validatePrompt(prompt);
       if (validationUpdate) {
         this.updateTaskHistory(task, validationUpdate);
         yield validationUpdate;
         return;
       }
-      // Estado inicial
+      // Initial state
       const initialUpdate = this.createTextMessage(
         "Starting video generation process..."
       );
       this.updateTaskHistory(task, initialUpdate);
       yield initialUpdate;
-      // Lanzar generación
+      // Launch generation
       const genUpdate = this.createTextMessage(
         "Generating video, please wait..."
       );
       this.updateTaskHistory(task, genUpdate);
       yield genUpdate;
-      // Iniciar generación (por simplicidad, sin imágenes de entrada)
+      // Start generation
       const response = await this.videoClient.generateVideo(
         task.id,
-        [],
+        task?.imageUrls || [],
         prompt
       );
-      // Polling de estado y espera
+      // Polling of status and wait
       let videoUrl = "";
       for await (const status of this.videoClient.waitForCompletion(task.id)) {
         if (isCancelled()) {
@@ -185,14 +185,14 @@ export class VideoGenerationController {
           videoUrl = (await this.videoClient.getVideo(task.id)).video.url;
           break;
         }
-        // Emitir progreso
+        // Emit progress
         const progressUpdate = this.createTextMessage(
           `Video generation progress: ${status.progress}%`
         );
         this.updateTaskHistory(task, progressUpdate);
         yield progressUpdate;
       }
-      // Artefacto final
+      // Final artifact
       const artifact: TaskArtifact = this.createArtifact(videoUrl);
       const finalUpdate: TaskYieldUpdate = {
         state: TaskState.COMPLETED,

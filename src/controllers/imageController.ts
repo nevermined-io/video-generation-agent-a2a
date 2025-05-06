@@ -141,28 +141,28 @@ export class ImageGenerationController {
         task.prompt ||
         task.message?.parts.find((p) => p.type === "text")?.text ||
         "";
-      // Validar prompt
+      // Validate prompt
       const validationUpdate = this.validatePrompt(prompt);
       if (validationUpdate) {
         this.updateTaskHistory(task, validationUpdate);
         yield validationUpdate;
         return;
       }
-      // Estado inicial
+      // Initial state
       const initialUpdate = this.createTextMessage(
         "Starting image generation process..."
       );
       this.updateTaskHistory(task, initialUpdate);
       yield initialUpdate;
-      // Lanzar generación
+      // Launch generation
       const genUpdate = this.createTextMessage(
         "Generating image, please wait..."
       );
       this.updateTaskHistory(task, genUpdate);
       yield genUpdate;
-      // Iniciar generación
+      // Start generation
       const response = await this.imageClient.generateImage(task.id, prompt);
-      // Polling de estado y espera
+      // Polling of status and wait
       let imageUrl = "";
       for await (const status of this.imageClient.waitForCompletion(task.id)) {
         if (isCancelled()) {
@@ -181,14 +181,14 @@ export class ImageGenerationController {
           imageUrl = (await this.imageClient.getImage(task.id)).image.url;
           break;
         }
-        // Emitir progreso
+        // Emit progress
         const progressUpdate = this.createTextMessage(
           `Image generation progress: ${status.progress}%`
         );
         this.updateTaskHistory(task, progressUpdate);
         yield progressUpdate;
       }
-      // Artefacto final
+      // Final artifact
       const artifact: TaskArtifact = this.createArtifact(imageUrl);
       const finalUpdate: TaskYieldUpdate = {
         state: TaskState.COMPLETED,

@@ -112,6 +112,10 @@ export interface Task {
    * @property {string} [taskType] - Type of the task (e.g., text2image, image2image, text2video)
    */
   taskType?: string;
+  /**
+   * @property {string[]} [imageUrls] - URLs of images for image generation tasks
+   */
+  imageUrls?: string[];
 }
 
 /**
