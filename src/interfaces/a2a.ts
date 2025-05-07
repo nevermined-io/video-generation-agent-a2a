@@ -26,7 +26,7 @@ export type MessageRole = "user" | "agent";
  * @type MessagePartType
  * @description Message part types supported by the protocol
  */
-export type MessagePartType = "text" | "image" | "audio" | "file";
+export type MessagePartType = "text" | "image" | "audio" | "file" | "video";
 
 /**
  * @interface MessagePart
@@ -68,6 +68,7 @@ export interface TaskStatus {
 export interface TaskArtifactPart {
   type: MessagePartType;
   text?: string;
+  url?: string;
   audioUrl?: string;
   file?: {
     bytes: string;
@@ -116,6 +117,14 @@ export interface Task {
    * @property {string[]} [imageUrls] - URLs of images for image generation tasks
    */
   imageUrls?: string[];
+  /**
+   * @property {Record<string, any>} [metadata] - Optional metadata for the task
+   */
+  metadata?: Record<string, any>;
+  /**
+   * @property {string[]} [acceptedOutputModes] - Optional accepted output modes for the task
+   */
+  acceptedOutputModes?: string[];
 }
 
 /**

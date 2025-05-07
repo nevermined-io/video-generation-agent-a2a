@@ -266,18 +266,66 @@ export class A2AController {
 
   /**
    * @method sendTask
-   * @description Create and send a new task
+   * @description Handle JSON-RPC 2.0 A2A task send (single-turn)
+   * @param {Request} req - Express request
+   * @param {Response} res - Express response
    */
   public sendTask = async (req: Request, res: Response): Promise<void> => {
     try {
-      Logger.info(`Sending task: ${req.body.prompt}`);
-      const task = await this.createTask(req.body);
-      res.json(task);
-    } catch (error) {
-      if (error instanceof Error) {
-        Logger.error(`Error sending task: ${error.message}`);
+      const { jsonrpc, id, method, params } = req.body;
+      if (jsonrpc !== "2.0" || !id || !method || !params) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id: id || null,
+          error: { code: -32600, message: "Invalid JSON-RPC 2.0 request" },
+        });
+        return;
       }
-      ErrorHandler.handleHttpError(error as Error, res);
+      const {
+        message,
+        metadata,
+        sessionId,
+        acceptedOutputModes,
+        taskType,
+        ...rest
+      } = params;
+      if (
+        !message ||
+        !message.parts ||
+        !Array.isArray(message.parts) ||
+        message.parts.length === 0
+      ) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32602,
+            message:
+              "Task must contain a non-empty message with at least one part",
+          },
+        });
+        return;
+      }
+      const task = await this.createTask({
+        id: params.id, // Puede venir del cliente
+        sessionId,
+        message,
+        metadata,
+        acceptedOutputModes,
+        taskType,
+        ...rest,
+      });
+      res.json({
+        jsonrpc: "2.0",
+        id,
+        result: task,
+      });
+    } catch (error) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        id: req.body?.id || null,
+        error: { code: -32000, message: (error as Error).message },
+      });
     }
   };
 
@@ -347,48 +395,49 @@ export class A2AController {
 
   /**
    * @method createTask
-   * @description Create and enqueue a new task
+   * @description Create and enqueue a new task (A2A compatible)
    */
   public async createTask(params: {
-    prompt: string;
+    id?: string;
     sessionId?: string;
+    message: Message;
+    metadata?: Record<string, any>;
+    acceptedOutputModes?: string[];
     taskType?: string;
     [key: string]: any;
   }): Promise<Task> {
     try {
-      // Create initial message
-      const message: Message = {
-        role: "user",
-        parts: [{ type: "text", text: params.prompt }],
-      };
-
-      // Create new task
+      const {
+        id,
+        sessionId,
+        message,
+        metadata,
+        acceptedOutputModes,
+        taskType,
+        ...rest
+      } = params;
       const task: Task = {
-        id: crypto.randomUUID(),
-        prompt: params.prompt,
+        id: id || crypto.randomUUID(),
+        prompt:
+          params.prompt ||
+          (message?.parts?.find((p) => p.type === "text")?.text ?? ""),
+        sessionId,
         status: {
           state: TaskState.SUBMITTED,
           timestamp: new Date().toISOString(),
         },
         message,
-        sessionId: params.sessionId,
-        taskType: params.taskType,
-        // Propaga cualquier otro campo relevante, pero omite los ya definidos
-        ...Object.fromEntries(
-          Object.entries(params).filter(
-            ([k]) => !["prompt", "sessionId", "taskType"].includes(k)
-          )
-        ),
+        metadata,
+        acceptedOutputModes,
+        taskType,
+        ...rest,
       };
-
       // Store task first
       const storedTask = await this.taskStore.createTask({ ...task });
       Logger.info(`Created task ${storedTask.id}`);
-
       // Then enqueue it
       await this.taskQueue.enqueueTask({ ...storedTask });
       Logger.info(`Enqueued task ${storedTask.id}`);
-
       return storedTask;
     } catch (error) {
       Logger.error(
@@ -489,28 +538,72 @@ export class A2AController {
 
   /**
    * @method sendTaskSubscribe
-   * @description Create and send a new task with subscription for real-time updates
+   * @description Handle JSON-RPC 2.0 A2A task send with subscription (multi-turn/streaming)
+   * @param {Request} req - Express request
+   * @param {Response} res - Express response
    */
   public sendTaskSubscribe = async (
     req: Request,
     res: Response
   ): Promise<void> => {
     try {
-      // Create and store the task
-      const task = await this.createTask(req.body);
-
-      // Send the task response immediately
-      res.json(task);
-
-      // Enqueue the task for processing
+      const { jsonrpc, id, method, params } = req.body;
+      if (jsonrpc !== "2.0" || !id || !method || !params) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id: id || null,
+          error: { code: -32600, message: "Invalid JSON-RPC 2.0 request" },
+        });
+        return;
+      }
+      const {
+        message,
+        metadata,
+        sessionId,
+        acceptedOutputModes,
+        taskType,
+        ...rest
+      } = params;
+      if (
+        !message ||
+        !message.parts ||
+        !Array.isArray(message.parts) ||
+        message.parts.length === 0
+      ) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32602,
+            message:
+              "Task must contain a non-empty message with at least one part",
+          },
+        });
+        return;
+      }
+      const task = await this.createTask({
+        id: params.id, // Puede venir del cliente
+        sessionId,
+        message,
+        metadata,
+        acceptedOutputModes,
+        taskType,
+        ...rest,
+      });
+      // Respond immediately with JSON-RPC envelope
+      res.json({
+        jsonrpc: "2.0",
+        id,
+        result: task,
+      });
+      // Enqueue the task for processing (do not await)
       await this.taskQueue.enqueueTask(task);
     } catch (error) {
-      Logger.error(
-        `Error in sendTaskSubscribe: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      ErrorHandler.handleHttpError(error as Error, res);
+      res.status(500).json({
+        jsonrpc: "2.0",
+        id: req.body?.id || null,
+        error: { code: -32000, message: (error as Error).message },
+      });
     }
   };
 

@@ -1,7 +1,7 @@
 {
-  "name": "song-generation-agent-a2a",
+  "name": "video-generation-agent-a2a",
   "version": "1.0.0",
-  "description": "A2A agent for generating songs with lyrics and melody",
+  "description": "A2A agent for generating images or videos based on a prompt and input images",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
@@ -9,9 +9,7 @@
     "dev": "ts-node src/server.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "generate-song": "ts-node scripts/generate-song.ts",
-    "debug:generate-song": "node --inspect-brk -r ts-node/register scripts/generate-song.ts"
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@fal-ai/client": "^1.4.0",

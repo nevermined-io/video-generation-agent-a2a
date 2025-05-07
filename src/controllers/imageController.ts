@@ -77,7 +77,7 @@ export class ImageGenerationController {
       parts: [
         {
           type: "image",
-          text: imageUrl,
+          url: imageUrl,
         },
       ],
       metadata: {
@@ -141,6 +141,7 @@ export class ImageGenerationController {
         task.prompt ||
         task.message?.parts.find((p) => p.type === "text")?.text ||
         "";
+
       // Validate prompt
       const validationUpdate = this.validatePrompt(prompt);
       if (validationUpdate) {

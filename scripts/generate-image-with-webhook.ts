@@ -27,25 +27,53 @@ async function startWebhookServer(): Promise<string> {
     const app = express();
     app.use(bodyParser.json());
 
-    //TODO: remove after testing
     app.post(CONFIG.webhookPath, (req, res) => {
       console.log(
         "[Webhook Client] Notification received:",
         JSON.stringify(req.body, null, 2)
       );
-      // Si hay artifacts de imagen, muéstralos
-      if (req.body?.artifacts) {
-        const imageArtifact = req.body.artifacts.find((artifact: any) =>
+      // Buscar artifacts en todas las ubicaciones posibles
+      const artifacts =
+        req.body.artifacts ||
+        req.body.data?.finalStatus?.artifacts ||
+        req.body.data?.status?.artifacts;
+      if (artifacts) {
+        const imageArtifact = artifacts.find((artifact: any) =>
           artifact.parts?.some((part: any) => part.type === "image")
         );
         if (imageArtifact) {
+          // 1. Search in part.url
+          let imageUrl: string | undefined = undefined;
           const imagePart = imageArtifact.parts.find(
-            (part: any) => part.type === "image"
+            (part: any) => part.type === "image" && part.url
           );
+          if (imagePart) {
+            imageUrl = imagePart.url;
+          }
+          // 2. If it doesn't exist, search in part.text and verify if it seems a URL
+          if (!imageUrl) {
+            const imageTextPart = imageArtifact.parts.find(
+              (part: any) =>
+                part.type === "image" &&
+                typeof part.text === "string" &&
+                part.text.startsWith("http")
+            );
+            if (imageTextPart) {
+              imageUrl = imageTextPart.text;
+            }
+          }
+          // 3. If it doesn't exist, search in artifact.metadata.url
+          if (
+            !imageUrl &&
+            (imageArtifact as any).metadata &&
+            (imageArtifact as any).metadata.url
+          ) {
+            imageUrl = (imageArtifact as any).metadata.url;
+          }
           const metadataPart = imageArtifact.parts.find(
             (part: any) => part.type === "text"
           );
-          console.log("[Webhook Client] Image URL:", imagePart?.url);
+          console.log("[Webhook Client] Image URL:", imageUrl);
           if (metadataPart?.text) {
             try {
               console.log(
@@ -83,18 +111,27 @@ async function createImageTask(params: {
   style?: string;
 }): Promise<string> {
   try {
+    const requestId = uuidv4();
     const taskRequest = {
-      prompt: params.prompt,
-      sessionId: uuidv4(),
-      taskType: "text2image",
+      jsonrpc: "2.0",
+      id: requestId,
+      method: "tasks/sendSubscribe",
+      params: {
+        message: {
+          role: "user",
+          parts: [{ type: "text", text: params.prompt }],
+        },
+        sessionId: uuidv4(),
+        taskType: "text2image",
+      },
     };
-    console.log("Sending image task request:", taskRequest);
+    console.log("Sending image task request (A2A JSON-RPC 2.0):", taskRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/sendSubscribe`,
       taskRequest
     );
     console.log("Server response:", response.data);
-    return response.data.id;
+    return response.data.result.id;
   } catch (error) {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);

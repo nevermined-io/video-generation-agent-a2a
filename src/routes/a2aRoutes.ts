@@ -27,6 +27,7 @@ router.get("/.well-known/agent.json", controller.getAgentCard);
 
 // Task management
 router.get("/tasks", controller.listTasks);
+// A2A JSON-RPC 2.0 endpoints
 router.post("/tasks/send", controller.sendTask);
 router.post("/tasks/sendSubscribe", controller.sendTaskSubscribe);
 router.get("/tasks/:taskId", controller.getTaskStatus);

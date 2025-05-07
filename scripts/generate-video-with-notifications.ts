@@ -25,6 +25,14 @@ interface TaskNotification {
     status?: {
       state: string;
       timestamp: string;
+      artifacts?: Array<{
+        parts: Array<{
+          type: string;
+          text?: string;
+          audioUrl?: string;
+          url?: string;
+        }>;
+      }>;
     };
     progress?: number;
     error?: string;
@@ -131,22 +139,29 @@ async function createVideoTask(params: {
   imageUrls?: string[];
 }): Promise<string> {
   try {
+    const requestId = uuidv4();
     const taskRequest = {
-      prompt: params.prompt,
-      sessionId: uuidv4(),
-      taskType: "text2video",
-      duration: params.duration,
-      imageUrls: params.imageUrls,
+      jsonrpc: "2.0",
+      id: requestId,
+      method: "tasks/sendSubscribe",
+      params: {
+        message: {
+          role: "user",
+          parts: [{ type: "text", text: params.prompt }],
+        },
+        sessionId: uuidv4(),
+        taskType: "text2video",
+        duration: params.duration,
+        imageUrls: params.imageUrls,
+      },
     };
-
-    console.log("Sending video task request:", taskRequest);
+    console.log("Sending video task request (A2A JSON-RPC 2.0):", taskRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/sendSubscribe`,
       taskRequest
     );
     console.log("Server response:", response.data);
-
-    return response.data.id;
+    return response.data.result.id;
   } catch (error) {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);
@@ -201,22 +216,50 @@ function subscribeToTaskUpdates(taskId: string): Promise<any> {
             ) {
               eventSource.close();
               if (notification.data.status.state === "COMPLETED") {
-                // Buscar el artifact de video en los artifacts devueltos
-                const videoArtifact = notification.data.artifacts?.find(
-                  (artifact: any) =>
-                    artifact.parts?.some((part: any) => part.type === "video")
+                // Buscar artifacts en todas las ubicaciones posibles
+                const artifacts =
+                  notification.data.status?.artifacts ||
+                  (notification.data as any)["finalStatus"]?.artifacts ||
+                  notification.data.artifacts;
+                const videoArtifact = artifacts?.find((artifact: any) =>
+                  artifact.parts?.some((part: any) => part.type === "video")
                 );
                 let result = notification.data;
                 if (videoArtifact) {
+                  // 1. Search in part.url
+                  let videoUrl: string | undefined = undefined;
                   const videoPart = videoArtifact.parts.find(
-                    (part: any) => part.type === "video"
+                    (part: any) => part.type === "video" && part.url
                   );
+                  if (videoPart) {
+                    videoUrl = videoPart.url;
+                  }
+                  // 2. If not found, search in part.text and verify if it seems a URL
+                  if (!videoUrl) {
+                    const videoTextPart = videoArtifact.parts.find(
+                      (part: any) =>
+                        part.type === "video" &&
+                        typeof part.text === "string" &&
+                        part.text.startsWith("http")
+                    );
+                    if (videoTextPart) {
+                      videoUrl = videoTextPart.text;
+                    }
+                  }
+                  // 3. If not found, search in artifact.metadata.url
+                  if (
+                    !videoUrl &&
+                    (videoArtifact as any).metadata &&
+                    (videoArtifact as any).metadata.url
+                  ) {
+                    videoUrl = (videoArtifact as any).metadata.url;
+                  }
                   const metadataPart = videoArtifact.parts.find(
                     (part: any) => part.type === "text"
                   );
                   result = {
                     ...(notification.data as any),
-                    videoUrl: videoPart?.url,
+                    videoUrl,
                     metadata: metadataPart?.text
                       ? JSON.parse(metadataPart.text)
                       : null,
@@ -320,10 +363,10 @@ async function generateVideoWithNotifications(videoParams: {
 // Run the script if called directly
 if (require.main === module) {
   const prompt =
-    process.argv[2] || "A timelapse of a city skyline, cinematic, 10 seconds";
+    process.argv[2] || "A timelapse of a city skyline, cinematic, 5 seconds";
   generateVideoWithNotifications({
     prompt,
-    duration: 10,
+    duration: 5,
     imageUrls: [
       "https://v3.fal.media/files/zebra/vKRttnrYOu5FuljgFxC7-.png",
       "https://v3.fal.media/files/monkey/mKJ72b67ckayIuX7Ql1pQ.png",

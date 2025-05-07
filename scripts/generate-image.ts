@@ -109,19 +109,28 @@ async function createImageTask(params: {
   style?: string;
 }): Promise<string> {
   try {
+    const requestId = uuidv4();
     const taskRequest = {
-      prompt: params.prompt,
-      sessionId: uuidv4(),
-      taskType: "text2image",
+      jsonrpc: "2.0",
+      id: requestId,
+      method: "tasks/send",
+      params: {
+        message: {
+          role: "user",
+          parts: [{ type: "text", text: params.prompt }],
+        },
+        sessionId: uuidv4(),
+        taskType: "text2image",
+        // Puedes añadir más parámetros aquí si lo deseas
+      },
     };
-
-    console.log("Sending image task request:", taskRequest);
+    console.log("Sending image task request (A2A JSON-RPC 2.0):", taskRequest);
     const response = await axios.post(
       `${CONFIG.serverUrl}/tasks/send`,
       taskRequest
     );
     console.log("Server response:", response.data);
-    return response.data.id;
+    return response.data.result.id;
   } catch (error) {
     if (error instanceof AxiosError) {
       console.error("API Response:", error.response?.data);
@@ -214,22 +223,48 @@ async function generateImage(imageParams: {
       if (status.status === "completed") {
         console.log("Image generation completed successfully!");
 
-        // Buscar el artifact de imagen en los artifacts devueltos
+        // Search for the image artifact
         const imageArtifact = status.artifacts?.find((artifact: any) =>
           artifact.parts?.some((part: any) => part.type === "image")
         );
 
         if (imageArtifact) {
+          // 1. Search in part.url
+          let imageUrl: string | undefined = undefined;
           const imagePart = imageArtifact.parts.find(
-            (part: any) => part.type === "image"
+            (part: any) => part.type === "image" && part.url
           );
+          if (imagePart) {
+            imageUrl = imagePart.url;
+          }
+          // 2. If not found, search in part.text and verify if it seems a URL
+          if (!imageUrl) {
+            const imageTextPart = imageArtifact.parts.find(
+              (part: any) =>
+                part.type === "image" &&
+                typeof part.text === "string" &&
+                part.text.startsWith("http")
+            );
+            if (imageTextPart) {
+              imageUrl = imageTextPart.text;
+            }
+          }
+          // 3. If not found, search in artifact.metadata.url
+          if (
+            !imageUrl &&
+            imageArtifact.metadata &&
+            imageArtifact.metadata.url
+          ) {
+            imageUrl = imageArtifact.metadata.url;
+          }
+          // 4. Extract metadata if exists
           const metadataPart = imageArtifact.parts.find(
             (part: any) => part.type === "text"
           );
 
           return {
             status: "completed",
-            imageUrl: imagePart?.url,
+            imageUrl,
             metadata: metadataPart?.text ? JSON.parse(metadataPart.text) : null,
             artifacts: status.artifacts,
           };

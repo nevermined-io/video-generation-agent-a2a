@@ -212,6 +212,8 @@ The agent implements the **A2A** (Agent-to-Agent) protocol, which defines:
 }
 ```
 
+> **Nota:** Los endpoints `/tasks/send` y `/tasks/sendSubscribe` requieren que todas las peticiones sean en formato JSON-RPC 2.0. El cuerpo debe incluir los campos `jsonrpc`, `id`, `method` y `params` siguiendo el estándar A2A.
+
 **Streaming SSE response example:**
 
 ```json
@@ -272,6 +274,8 @@ The agent exposes the following skills via the A2A protocol:
 
 ```json
 {
+  "jsonrpc": "2.0",
+  "id": 1,
   "method": "tasks/send",
   "params": {
     "id": "task-123",
@@ -302,6 +306,8 @@ The agent exposes the following skills via the A2A protocol:
 
 ```json
 {
+  "jsonrpc": "2.0",
+  "id": 2,
   "method": "tasks/send",
   "params": {
     "id": "task-456",
@@ -344,7 +350,7 @@ The repository includes example scripts to interact with the agent:
 
 ### 1. Classic polling (`scripts/generate-image.ts`, `scripts/generate-video.ts`)
 
-Launches a task and periodically checks its status until completion.
+Lanza una tarea y consulta periódicamente su estado hasta la finalización. Usa el formato JSON-RPC 2.0 para enviar la tarea:
 
 ```bash
 yarn ts-node scripts/generate-image.ts
@@ -353,7 +359,7 @@ yarn ts-node scripts/generate-video.ts
 
 ### 2. SSE notifications (`scripts/generate-image-with-notifications.ts`, `scripts/generate-video-with-notifications.ts`)
 
-Launches a task and subscribes to SSE events to receive real-time updates.
+Lanza una tarea y se suscribe a eventos SSE para recibir actualizaciones en tiempo real. Usa el formato JSON-RPC 2.0:
 
 ```bash
 yarn ts-node scripts/generate-image-with-notifications.ts "A futuristic cityscape"
@@ -362,7 +368,7 @@ yarn ts-node scripts/generate-video-with-notifications.ts "A time-lapse of a flo
 
 ### 3. Webhooks (`scripts/generate-image-with-webhook.ts`, `scripts/generate-video-with-webhook.ts`)
 
-Launches a task and registers a local webhook to receive push notifications.
+Lanza una tarea y registra un webhook local para recibir notificaciones push. Usa el formato JSON-RPC 2.0:
 
 ```bash
 yarn ts-node scripts/generate-image-with-webhook.ts "A surreal landscape"

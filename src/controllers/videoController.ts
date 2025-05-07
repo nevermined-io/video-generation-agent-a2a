@@ -76,8 +76,8 @@ export class VideoGenerationController {
     return {
       parts: [
         {
-          type: "file",
-          text: videoUrl,
+          type: "video",
+          url: videoUrl,
         },
       ],
       metadata: {
