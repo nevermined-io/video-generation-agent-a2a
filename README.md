@@ -1,270 +1,401 @@
 [![banner](https://raw.githubusercontent.com/nevermined-io/assets/main/images/logo/banner_logo.png)](https://nevermined.io)
 
-Song Generator Agent (TypeScript)
-=================================
+Image & Video Generation Agent (TypeScript)
+===========================================
 
-> A TypeScript agent that listens for tasks via the **Nevermined Payments** framework, automatically generates lyrics and other metadata using **LangChain** + **OpenAI**, and then produces a final song audio track through **Suno**’s AI Music Generation API. It manages multiple steps internally, uses a modular architecture, and can be easily scaled or extended.
+> A TypeScript agent that listens for tasks via the **A2A** (Agent-to-Agent) protocol, automatically generates images and videos from text prompts using advanced AI models. It supports real-time notifications (SSE) and webhooks, and is designed for seamless orchestration in multi-agent workflows.
 
-* * *
+---
 
 **Description**
 ---------------
 
-The **Song Generator Agent** is designed to:
+The **Image & Video Generation Agent** is designed to:
 
-1.  **Receive** prompts or “ideas” for songs (e.g., “A futuristic R&B track about neon cities”).
-2.  **Optionally** generate missing metadata (e.g., lyrics, title, tags) using **LangChain** and **OpenAI**.
-3.  **Invoke** the **Suno** API to synthesize an audio track (MP3) based on the prompt + metadata.
-4.  **Output** the final track’s URL, title, duration, and lyrics.
-5.  **Integrate** seamlessly with **Nevermined Payments**, listening for “step-updated” events and updating steps as they progress or fail.
+1. **Receive** prompts for image or video generation via the A2A protocol.
+2. **Generate** images or videos using state-of-the-art AI models, based on the provided prompt and parameters.
+3. **Output** the final artifact (image or video URL) and metadata.
+4. **Support** real-time updates and notifications via SSE and webhooks.
 
-This agent is well-suited for multi-step AI workflows where you want to automate music production.
+This agent implements the **A2A** protocol, enabling standard orchestration and communication between Nevermined agents and third-party systems.
 
-* * *
+---
 
 **Related Projects**
 --------------------
 
-This **Song Generator Agent** is part of a larger ecosystem of AI-driven media creation. For a complete view of how multiple agents work together, see:
+This agent is part of an AI-powered multimedia creation ecosystem. See how it interacts with other agents:
 
-1.  [Music Video Orchestrator Agent](https://github.com/nevermined-io/music-video-orchestrator)
-    
-    *   Coordinates end-to-end workflows: collects user prompts, splits them into tasks, pays agents in multiple tokens, merges final output.
-2.  [Script Generator Agent](https://github.com/nevermined-io/movie-script-generator-agent)
+1. [Music Video Orchestrator Agent](https://github.com/nevermined-io/music-video-orchestrator)
+   * Orchestrates end-to-end workflows: collects prompts, splits tasks, pays agents, merges results.
+2. [Script Generator Agent](https://github.com/nevermined-io/movie-script-generator-agent)
+   * Generates cinematic scripts, extracts scenes and characters, produces prompts for video.
+3. [Song Generator Agent](https://github.com/nevermined-io/song-generation-agent)
+   * Produces music using third-party APIs and AI models.
 
-*   Generates cinematic scripts, extracts scene info, identifies settings and characters, producing prompts for video generation.
-3.  [Image / Video Generator Agent](https://github.com/nevermined-io/video-generator-agent)
-    
-    *   Produces Images / Video using 3rd party wrapper APIs (Fal.ai and TTapi, wrapping Flux and Kling.ai)
-
-
-**Workflow Example**:
+**Workflow example:**
 
 ```
 [ User Prompt ] --> [Music Orchestrator] --> [Song Generation] --> [Script Generation] --> [Image/Video Generation] --> [Final Compilation]
 ```
 
-* * *
+---
 
 **Table of Contents**
 ---------------------
 
-*   [Features](#features)
-*   [Prerequisites](#prerequisites)
-*   [Installation](#installation)
-*   [Environment Variables](#environment-variables)
-*   [Project Structure](#project-structure)
-*   [Architecture & Workflow](#architecture--workflow)
-*   [Usage](#usage)
-*   [How It Works Internally](#how-it-works-internally)
-*   [Development & Testing](#development--testing)
-*   [License](#license)
+1. [Features](#features)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Environment Variables](#environment-variables)
+5. [Project Structure](#project-structure)
+6. [Architecture & Workflow](#architecture--workflow)
+7. [A2A Protocol](#a2a-protocol)
+8. [Skills](#skills)
+9. [Usage](#usage)
+10. [Examples & Scripts](#examples--scripts)
+11. [Development & Testing](#development--testing)
+12. [License](#license)
 
-* * *
+---
 
 **Features**
-------------
+-------------
 
-*   **Nevermined Integration**: Subscribes to tasks via `step-updated` events and updates them automatically.
-*   **Automatic Metadata Generation**: Uses **LangChain** + **OpenAI** for lyrics, titles, and tag creation.
-*   **Suno Music Generation**: Calls Suno’s AI for track synthesis, monitors progress, and retrieves the final MP3.
-*   **Concurrent Step Handling**: Splits tasks into multiple steps (e.g., `autoGenerateMetadata`, `buildSong`), each with its own logic.
-*   **Configurable**: Customize your prompts, model versions, or usage of OpenAI.
-*   **Logging & Error Handling**: Comprehensive logs (info, success, warn, error) via a custom `Logger`.
-*   **SOLID, Modular Architecture**: Each function or class has a single responsibility, ensuring maintainability.
+* **A2A protocol**: Full support for task orchestration, state transitions, SSE notifications, and webhooks.
+* **Image and video generation**: Advanced AI models for text-to-image, image-to-image, and text-to-video.
+* **Real-time notifications**: SSE and webhook support for task updates.
+* **Configurable**: Customize prompts, models, and parameters.
+* **Logging and error management**: Detailed logs via a custom `Logger`.
+* **Modular and SOLID architecture**: Each class/function has a clear responsibility.
 
-* * *
+---
 
 **Prerequisites**
 -----------------
 
-*   **Node.js** (>= 18.0.0 recommended)
-*   **TypeScript** (project built on ^5.7.0 or later)
-*   **Nevermined** credentials (API key, environment settings, and an `AGENT_DID`)
-*   **Suno API Key** (for music generation)
-*   **OpenAI API Key** (for metadata/lyrics generation via LangChain)
+* **Node.js** (>= 18.0.0 recommended)
+* **TypeScript** (^5.7.0 or higher)
+* **API keys** for any third-party AI services used (if required)
 
-* * *
+---
 
 **Installation**
 ----------------
 
-1.  **Clone** the repository:
-    
+1. **Clone** the repository:
     ```bash
-    git clone https://github.com/nevermined-io/song-generation-agent.git
-    cd song-generation-agent
+    git clone https://github.com/nevermined-io/video-generation-agent-a2a.git
+    cd video-generation-agent-a2a
     ```
-    
-2.  **Install** dependencies:
-    
+2. **Install** dependencies:
     ```bash
     yarn install
     ```
-    
-3.  **Build** the project (optional for production):
-    
+3. **Configure** the environment:
+    ```bash
+    cp .env.example .env
+    # Edit .env and add your keys
+    ```
+4. **Build** the project (optional for production):
     ```bash
     yarn build
     ```
-    
 
-* * *
+---
 
 **Environment Variables**
 -------------------------
 
-Rename `.env.example` to `.env` and set the required variables:
+Rename `.env.example` to `.env` and set the required keys:
 
 ```env
-SUNO_API_KEY=your_suno_api_key
-OPENAI_API_KEY=your_openai_api_key
-NVM_API_KEY=your_nevermined_api_key
-NVM_ENVIRONMENT=testing
-AGENT_DID=did:nv:xxx-song-agent
-IS_DUMMY=false
-DUMMY_JOB_ID=foobar
+# Example
+FAL_API_KEY=your_fal_key
+PIAPI_KEY=your_piapi_key
 ```
 
-*   `SUNO_API_KEY`
-*   `OPENAI_API_KEY`
-*   `NVM_API_KEY`
-*   `NVM_ENVIRONMENT` (e.g., `testing`, `staging`, or `production`)
-*   `AGENT_DID` (identifies this Song Generator Agent)
-*   `IS_DUMMY` / `DUMMY_JOB_ID` (optional testing flags)
+* `FAL_API_KEY`: Access to Fal.ai for image/video generation (if used).
+* `PIAPI_KEY`: Access to TTapi for video generation (if used).
 
-* * *
+---
 
 **Project Structure**
 ---------------------
 
-```
-.
-├── clients/
-│   └── sunoClient.ts          # Client for interacting with the Suno API
-├── config/
-│   └── env.ts                 # Loads environment variables from .env
-├── interfaces/
-│   └── apiResponses.ts        # Type definitions for Suno API responses
-├── utils/
-│   ├── logger.ts              # Logging utility with color-coded levels
-│   ├── utils.ts               # General helpers (e.g., track duration)
-│   └── checkEnv.ts            # Validates environment variables on startup
-├── songMetadataGenerator.ts   # Class that uses LangChain+OpenAI to generate metadata
-├── main.ts                    # Main entry, listens to step-updated events & routes steps
+```plaintext
+video-generation-agent-a2a/
+├── src/
+│   ├── server.ts                # Main entry point (Express)
+│   │   └── a2aRoutes.ts         # RESTful and A2A routes
+│   ├── controllers/
+│   │   ├── a2aController.ts     # Main A2A protocol logic
+│   │   ├── imageController.ts   # Image generation logic
+│   │   └── videoController.ts   # Video generation logic
+│   ├── core/
+│   │   ├── taskProcessor.ts     # Task processing
+│   │   ├── taskStore.ts         # Task storage and lifecycle
+│   │   └── ...
+│   ├── services/
+│   │   ├── pushNotificationService.ts # SSE and webhook notifications
+│   │   └── streamingService.ts  # Real-time SSE streaming
+│   ├── clients/                 # API clients for third-party services
+│   ├── interfaces/              # Types and A2A contracts
+│   ├── models/                  # Data models (Task, Artifact)
+│   ├── utils/                   # Utilities and logger
+│   └── config/                  # Configuration and environment variables
+├── scripts/
+│   ├── generate-image.ts
+│   ├── generate-image-with-notifications.ts
+│   ├── generate-image-with-webhook.ts
+│   ├── generate-video.ts
+│   ├── generate-video-with-notifications.ts
+│   └── generate-video-with-webhook.ts
 ├── package.json
-├── tsconfig.json
-└── README.md                  # This file
+└── README.md
 ```
 
-Key highlights:
-
-*   **`main.ts`**: Entry point that initializes **Nevermined** payments, subscribes to steps for this agent’s DID, and routes to step handlers (`handleInitStep`, `handleAutoGenerateMetadataStep`, `handleBuildSongStep`).
-*   **`songMetadataGenerator.ts`**: Orchestrates **LangChain** + **OpenAI** calls to produce lyrics, a title, and tags.
-*   **`clients/sunoClient.ts`**: Talks to the **Suno** API for generating music. It can poll for status, retrieve the final track URL, and handle errors gracefully.
-
-* * *
+---
 
 **Architecture & Workflow**
 ---------------------------
 
-When the **Song Generator Agent** receives a new **task** (usually labeled `init` for the first step), it checks if the user provided metadata (lyrics, title, tags). If not, the agent creates an intermediate step to **auto-generate metadata** via `SongMetadataGenerator`. Finally, it proceeds to the **buildSong** step, which:
+1. **Task reception**: The agent exposes RESTful and A2A endpoints (`/tasks/send`, `/tasks/sendSubscribe`) to receive prompts and parameters.
+2. **Image/video generation**: The agent processes the task and invokes the appropriate AI model or API.
+3. **Notifications**: The agent emits status updates and results via SSE (`/tasks/:taskId/notifications`) or webhooks.
+4. **Result delivery**: The user receives the artifact URL and metadata as A2A artifacts.
 
-1.  Calls **Suno** to start a music generation job.
-2.  Periodically checks the status until it’s either `SUCCESS` or `FAILED`.
-3.  Logs and returns the final audio URL, duration, and metadata to **Nevermined**.
+**Simplified flow diagram:**
 
-### Step-by-Step Flow
+```
+Client         Agent           AI Model/API
+  |             |               |
+  |--Task------>|               |
+  |             |--Generate---->|
+  |             |  image/video  |
+  |             |<--------------|
+  |<------------|   SSE/Webhook |
+  |<------------|   Final result|
+```
 
-1.  **init**
-    
-    *   Checks for existing metadata in `step.input_artifacts`.
-    *   If missing, creates `autoGenerateMetadata` then `buildSong`.
-    *   Otherwise, creates `buildSong` directly.
-2.  **autoGenerateMetadata**
-    
-    *   Invokes the `SongMetadataGenerator` to produce a new title, lyrics, and tags.
-    *   Stores them in `output_artifacts`.
-3.  **buildSong**
-    
-    *   Uses `SunoClient` to create a music generation job.
-    *   Waits for completion (by periodically checking status).
-    *   Retrieves the final audio file, calculates duration, and updates `output_artifacts`.
+---
 
-* * *
+**A2A Protocol**
+----------------
+
+The agent implements the **A2A** (Agent-to-Agent) protocol, which defines:
+
+- **Task states**: `submitted`, `working`, `input-required`, `completed`, `failed`, `cancelled`.
+- **Messages**: Standard structure with `role`, `parts` (text, image, video, file, etc.).
+- **Artifacts**: Structured responses with parts (image, video, text, metadata).
+- **Notifications**: Real-time updates via SSE or webhooks.
+
+**A2A request example (JSON-RPC):**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tasks/sendSubscribe",
+  "params": {
+    "id": "unique-task-id",
+    "sessionId": "user-session-123",
+    "acceptedOutputModes": ["image/png"],
+    "message": {
+      "role": "user",
+      "parts": [
+        { "type": "text", "text": "Generate a futuristic cityscape at night" }
+      ]
+    },
+    "taskType": "text2image"
+  }
+}
+```
+
+**Streaming SSE response example:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "id": "unique-task-id",
+    "status": {
+      "state": "working",
+      "timestamp": "2024-06-01T12:00:00Z",
+      "message": {
+        "role": "agent",
+        "parts": [
+          { "type": "text", "text": "Generating image..." }
+        ]
+      }
+    },
+    "final": false
+  }
+}
+```
+
+**Final artifact:**
+
+```json
+{
+  "parts": [
+    { "type": "image", "url": "https://.../image.png" }
+  ],
+  "metadata": {
+    "prompt": "Generate a futuristic cityscape at night"
+  },
+  "index": 0
+}
+```
+
+---
+
+**Skills**
+----------
+
+> **Important:**
+> The `taskType` parameter is **mandatory** and determines the type of operation the agent will perform. Always specify `taskType` in your request. If omitted or incorrect, the agent will not know which skill to execute and will return an error.
+
+The agent exposes the following skills via the A2A protocol:
+
+### 1. Image Generation (`image-generation`)
+
+- **Description**: Generates an image from a text prompt.
+- **Input Modes**: `text/plain`, `application/json`
+- **Output Modes**: `image/png`, `application/json`
+- **Parameters**:
+  - `taskType` (string, required): Type of image generation task. Must be `"text2image"`.
+  - `prompt` (string, required): Text prompt for image generation.
+
+**Example: text2image**
+
+```json
+{
+  "method": "tasks/send",
+  "params": {
+    "id": "task-123",
+    "sessionId": "session-abc",
+    "message": {
+      "role": "user",
+      "parts": [
+        { "type": "text", "text": "A surreal landscape with floating islands" }
+      ]
+    },
+    "taskType": "text2image"
+  }
+}
+```
+
+### 2. Video Generation (`video-generation`)
+
+- **Description**: Generates a video from a text prompt and one or more reference images.
+- **Input Modes**: `text/plain`, `application/json`
+- **Output Modes**: `video/mp4`, `application/json`
+- **Parameters**:
+  - `taskType` (string, required): Type of video generation task. Must be `"text2video"`.
+  - `prompt` (string, required): Text prompt for video generation.
+  - `imageUrls` (string[], required): List of reference image URLs.
+  - `duration` (number, optional): Video duration in seconds (5 or 10).
+
+**Example: text2video**
+
+```json
+{
+  "method": "tasks/send",
+  "params": {
+    "id": "task-456",
+    "sessionId": "session-def",
+    "message": {
+      "role": "user",
+      "parts": [
+        { "type": "text", "text": "A time-lapse of a flower blooming" }
+      ]
+    },
+    "taskType": "text2video",
+    "imageUrls": [
+      "https://example.com/flower1.png",
+      "https://example.com/flower2.png"
+    ],
+    "duration": 10
+  }
+}
+```
+
+---
 
 **Usage**
 ---------
 
-1.  **Configure** `.env` with the relevant keys.
-    
-2.  **Start** the agent in development mode:
-    
+1. **Configure** `.env` with your keys.
+2. **Start** the agent in development mode:
     ```bash
     yarn dev
     ```
-    
-    The agent will then log into **Nevermined** and wait for any `step-updated` events targeting its `AGENT_DID`.
-    
-3.  **Send a Prompt**
-    
-    *   Typically, a higher-level Orchestrator (e.g., the **Music Video Orchestrator**) dispatches tasks that mention this Song Generator’s DID.
-    *   Once triggered, the agent spawns steps for metadata creation (if needed) and final audio generation.
+   The agent will wait for A2A or REST tasks.
+3. **Send a prompt** using a compatible client (see examples below).
 
-* * *
+---
 
-**How It Works Internally**
----------------------------
+**Examples & Scripts**
+----------------------
 
-1.  **Nevermined Subscription**
-    
-    *   `Payments.getInstance({...})` authenticates with the **Nevermined** server.
-    *   `payments.query.subscribe(processSteps(payments), {...})` sets up an event listener.
-2.  **Processing Steps**
-    
-    *   A function `processSteps(...)` receives each `step-updated` event.
-    *   It fetches the latest step info with `payments.query.getStep(...)`.
-    *   Based on `step.name`, it calls the corresponding handler function.
-3.  **Handlers**
-    
-    *   **`handleInitStep()`**: Checks for existing metadata. If missing, creates two sub-steps: `autoGenerateMetadata`, then `buildSong`. If present, only creates `buildSong`.
-    *   **`handleAutoGenerateMetadataStep()`**: Uses **LangChain** + **OpenAI** to produce a JSON object with `title`, `lyrics`, `tags`.
-    *   **`handleBuildSongStep()`**: Calls **Suno** using `SunoClient`. Waits until the job is complete, then stores the final track details.
-4.  **Logging & Error Handling**
-    
-    *   Each function logs relevant info or errors with the custom `Logger`.
-    *   If any step fails (e.g., Suno returns an error), the handler updates the step to `Failed`.
-5.  **Output Artifacts**
-    
-    *   Agents store data in `output_artifacts` (e.g., an array of objects describing the final song).
-    *   This is how other steps or orchestrators retrieve the MP3 URL, duration, or lyrics.
+The repository includes example scripts to interact with the agent:
 
-* * *
+### 1. Classic polling (`scripts/generate-image.ts`, `scripts/generate-video.ts`)
+
+Launches a task and periodically checks its status until completion.
+
+```bash
+yarn ts-node scripts/generate-image.ts
+yarn ts-node scripts/generate-video.ts
+```
+
+### 2. SSE notifications (`scripts/generate-image-with-notifications.ts`, `scripts/generate-video-with-notifications.ts`)
+
+Launches a task and subscribes to SSE events to receive real-time updates.
+
+```bash
+yarn ts-node scripts/generate-image-with-notifications.ts "A futuristic cityscape"
+yarn ts-node scripts/generate-video-with-notifications.ts "A time-lapse of a flower blooming"
+```
+
+### 3. Webhooks (`scripts/generate-image-with-webhook.ts`, `scripts/generate-video-with-webhook.ts`)
+
+Launches a task and registers a local webhook to receive push notifications.
+
+```bash
+yarn ts-node scripts/generate-image-with-webhook.ts "A surreal landscape"
+yarn ts-node scripts/generate-video-with-webhook.ts "A time-lapse of a flower blooming"
+```
+
+---
 
 **Development & Testing**
 -------------------------
 
-### Running Locally
+### Local execution
 
-*   **Start** the service in dev mode:
-    
-    ```bash
-    yarn dev
-    ```
-    
-*   By default, it subscribes to the `AGENT_DID` in your `.env`.
-    
+```bash
+yarn dev
+```
 
-### Building for Production
+### Build for production
 
 ```bash
 yarn build
 ```
 
-* * *
+### Testing
+
+```bash
+yarn test
+```
+
+---
 
 **License**
------------
+------------
 
 ```
 Apache License 2.0

@@ -202,8 +202,7 @@ export class A2AController {
         {
           id: "image-generation",
           name: "Image Generation",
-          description:
-            "Generates an image from a text prompt (and optionally an input image)",
+          description: "Generates an image from a text prompt.",
           tags: ["image", "generation", "ai"],
           inputModes: ["text/plain", "application/json"],
           outputModes: ["image/png", "application/json"],
@@ -211,22 +210,15 @@ export class A2AController {
             {
               name: "taskType",
               description:
-                "Type of image generation task. Must be 'text2image' or 'image2image' (required)",
+                "Type of image generation task. Must be 'text2image' (required)",
               required: true,
               type: "string",
-              enum: ["text2image", "image2image"],
+              enum: ["text2image"],
             },
             {
               name: "prompt",
               description: "Text prompt for image generation",
               required: true,
-              type: "string",
-            },
-            {
-              name: "inputImageUrl",
-              description:
-                "URL of an input image for transformation (required for 'image2image')",
-              required: false,
               type: "string",
             },
           ],

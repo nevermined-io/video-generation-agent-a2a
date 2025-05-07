@@ -56,13 +56,13 @@ export class TaskProcessor {
 
       // Route to the correct controller based on taskType
       let controller;
-      if (task.taskType === "text2image" || task.taskType === "image2image") {
+      if (task.taskType === "text2image") {
         controller = this.imageController;
       } else if (task.taskType === "text2video") {
         controller = this.videoController;
       } else {
         throw new Error(
-          "Invalid or missing taskType. Must be one of: text2image, image2image, text2video."
+          "Invalid or missing taskType. Must be one of: text2image, text2video."
         );
       }
       for await (const update of controller.handleTask(context)) {
