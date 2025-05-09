@@ -608,7 +608,6 @@ export class A2AController {
           id,
           result: { taskId },
         });
-        await this.taskQueue.enqueueTask(task);
         return;
       }
       // Default: SSE mode (keep connection open)
@@ -616,7 +615,6 @@ export class A2AController {
         taskId,
         eventTypes,
       });
-      await this.taskQueue.enqueueTask(task);
     } catch (error) {
       if (!res.headersSent) {
         res.status(500).json({
