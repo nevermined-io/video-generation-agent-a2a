@@ -103,7 +103,6 @@ export interface TaskHistoryEntry {
  */
 export interface Task {
   id: string;
-  prompt: string;
   sessionId?: string;
   status: TaskStatus;
   artifacts?: TaskArtifact[];

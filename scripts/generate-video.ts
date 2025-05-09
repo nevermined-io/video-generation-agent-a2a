@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // Configuration
 const CONFIG = {
-  serverUrl: process.env.SERVER_URL || "http://localhost:8000",
+  serverUrl: process.env.SERVER_URL || "http://localhost:8003",
   pollingInterval: 5000, // 5 seconds
   maxRetries: 60, // 5 minutes maximum waiting time
 };
@@ -111,6 +111,9 @@ async function createVideoTask(params: {
 }): Promise<string> {
   try {
     const requestId = uuidv4();
+    const metadata: Record<string, any> = {};
+    if (params.imageUrls) metadata.imageUrls = params.imageUrls;
+    if (params.duration) metadata.duration = params.duration;
     const taskRequest = {
       jsonrpc: "2.0",
       id: requestId,
@@ -121,9 +124,8 @@ async function createVideoTask(params: {
           parts: [{ type: "text", text: params.prompt }],
         },
         sessionId: uuidv4(),
+        metadata,
         taskType: "text2video",
-        duration: params.duration,
-        imageUrls: params.imageUrls,
       },
     };
     console.log("Sending video task request (A2A JSON-RPC 2.0):", taskRequest);

@@ -138,9 +138,7 @@ export class ImageGenerationController {
     const { task, isCancelled } = context;
     try {
       const prompt =
-        task.prompt ||
-        task.message?.parts.find((p) => p.type === "text")?.text ||
-        "";
+        task.message?.parts.find((p) => p.type === "text")?.text || "";
 
       // Validate prompt
       const validationUpdate = this.validatePrompt(prompt);

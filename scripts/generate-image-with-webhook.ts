@@ -1,18 +1,19 @@
 /**
- * Script to generate an image using the Nevermined agent with webhook notifications
- * Instead of SSE, it registers a webhook and receives notifications via HTTP POST
- * @todo Remove the express server after testing
+ * Script to generate an image using the Nevermined agent with webhook notifications (A2A JSON-RPC 2.0)
+ * Hace una única petición POST a /tasks/sendSubscribe con notification.mode: 'webhook' y notification.url.
  */
 
-import axios, { AxiosError } from "axios";
 import { v4 as uuidv4 } from "uuid";
 import express from "express";
 import bodyParser from "body-parser";
 import { AddressInfo } from "net";
+import http from "http";
+import https from "https";
+import { URL } from "url";
 
 // Configuration
 const CONFIG = {
-  serverUrl: process.env.SERVER_URL || "http://localhost:8000",
+  serverUrl: process.env.SERVER_URL || "http://localhost:8003",
   webhookPort: 4001,
   webhookPath: "/webhook-test-client",
   eventTypes: ["status_update", "completion"],
@@ -102,98 +103,87 @@ async function startWebhookServer(): Promise<string> {
 }
 
 /**
- * Creates a new image generation task
+ * Creates a new image generation task and registers webhook in a single call
  * @param {Object} params Image generation parameters
- * @returns {Promise<string>} Task ID
- */
-async function createImageTask(params: {
-  prompt: string;
-  style?: string;
-}): Promise<string> {
-  try {
-    const requestId = uuidv4();
-    const taskRequest = {
-      jsonrpc: "2.0",
-      id: requestId,
-      method: "tasks/sendSubscribe",
-      params: {
-        message: {
-          role: "user",
-          parts: [{ type: "text", text: params.prompt }],
-        },
-        sessionId: uuidv4(),
-        taskType: "text2image",
-      },
-    };
-    console.log("Sending image task request (A2A JSON-RPC 2.0):", taskRequest);
-    const response = await axios.post(
-      `${CONFIG.serverUrl}/tasks/sendSubscribe`,
-      taskRequest
-    );
-    console.log("Server response:", response.data);
-    return response.data.result.id;
-  } catch (error) {
-    if (error instanceof AxiosError) {
-      console.error("API Response:", error.response?.data);
-      throw new Error(
-        `Failed to create image generation task: ${error.message}`
-      );
-    }
-    throw new Error("Failed to create image generation task: Unknown error");
-  }
-}
-
-/**
- * Registers a webhook for receiving notifications for a task
- * @param {string} taskId The task ID
+ * @param {string} params.prompt The prompt for the image
+ * @param {string} [params.style] Optional style
  * @param {string} webhookUrl The webhook URL
  * @returns {Promise<void>}
  */
-async function registerWebhook(
-  taskId: string,
+async function generateImageWithWebhook(
+  params: {
+    prompt: string;
+    style?: string;
+  },
   webhookUrl: string
 ): Promise<void> {
-  try {
-    const config = {
-      taskId,
-      eventTypes: CONFIG.eventTypes,
-      webhookUrl,
-    };
-    console.log("Registering webhook:", config);
-    const response = await axios.post(
-      `${CONFIG.serverUrl}/tasks/${taskId}/notifications`,
-      config
-    );
-    console.log("Webhook registration response:", response.data);
-  } catch (error) {
-    if (error instanceof AxiosError) {
-      console.error("Webhook registration error:", error.response?.data);
-      throw new Error(`Failed to register webhook: ${error.message}`);
-    }
-    throw new Error("Failed to register webhook: Unknown error");
-  }
-}
+  // Build the message according to A2A
+  const message = {
+    role: "user",
+    parts: [{ type: "text", text: params.prompt }],
+  };
+  const metadata: Record<string, any> = {};
+  if (params.style) metadata.style = params.style;
 
-/**
- * Main function to generate an image and receive webhook notifications
- * @param {Object} imageParams Parameters for image generation
- * @returns {Promise<void>}
- */
-async function generateImageWithWebhook(imageParams: {
-  prompt: string;
-  style?: string;
-}): Promise<void> {
-  // Start webhook server
-  const webhookUrl = await startWebhookServer();
+  // JSON-RPC 2.0 request body with webhook notification
+  const jsonRpcRequest = {
+    jsonrpc: "2.0",
+    id: uuidv4(),
+    method: "tasks/sendSubscribe",
+    params: {
+      sessionId: uuidv4(),
+      message,
+      metadata,
+      taskType: "text2image",
+      notification: {
+        mode: "webhook",
+        url: webhookUrl,
+        eventTypes: CONFIG.eventTypes,
+      },
+    },
+  };
 
-  // Create task
-  const taskId = await createImageTask(imageParams);
-  console.log(`Task created with ID: ${taskId}`);
+  // Prepare HTTP(S) request options
+  const url = new URL("/tasks/sendSubscribe", CONFIG.serverUrl);
+  const isHttps = url.protocol === "https:";
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  };
 
-  // Register webhook
-  await registerWebhook(taskId, webhookUrl);
+  // Choose http or https module
+  const client = isHttps ? https : http;
 
-  console.log("Waiting for webhook notifications... (press Ctrl+C to exit)");
+  // Make the POST request
+  await new Promise<void>((resolve, reject) => {
+    const req = client.request(url, options, (res) => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        data += chunk;
+      });
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
+          console.log("[Webhook Client] Task creation response:", parsed);
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      });
+      res.on("error", (err) => {
+        reject(err);
+      });
+    });
+    req.on("error", (err) => {
+      reject(err);
+    });
+    req.write(JSON.stringify(jsonRpcRequest));
+    req.end();
+  });
 }
 
 // Run the script if called directly
@@ -201,12 +191,18 @@ if (require.main === module) {
   const prompt =
     process.argv[2] ||
     "A futuristic cityscape at sunset, highly detailed, digital art";
-  generateImageWithWebhook({ prompt })
-    .then(() => {})
-    .catch((error) => {
-      console.error("Script failed:", error);
-      process.exit(1);
-    });
+  startWebhookServer().then((webhookUrl) =>
+    generateImageWithWebhook({ prompt }, webhookUrl)
+      .then(() => {
+        console.log(
+          "Waiting for webhook notifications... (press Ctrl+C to exit)"
+        );
+      })
+      .catch((error) => {
+        console.error("Script failed:", error);
+        process.exit(1);
+      })
+  );
 }
 
 export { generateImageWithWebhook };

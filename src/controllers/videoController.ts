@@ -138,9 +138,7 @@ export class VideoGenerationController {
     const { task, isCancelled } = context;
     try {
       const prompt =
-        task.prompt ||
-        task.message?.parts.find((p) => p.type === "text")?.text ||
-        "";
+        task.message?.parts.find((p) => p.type === "text")?.text || "";
       // Validate prompt
       const validationUpdate = this.validatePrompt(prompt);
       if (validationUpdate) {
@@ -161,10 +159,18 @@ export class VideoGenerationController {
       this.updateTaskHistory(task, genUpdate);
       yield genUpdate;
       // Start generation
+      const imageUrls = Array.isArray(task.metadata?.imageUrls)
+        ? task.metadata.imageUrls
+        : [];
+      const duration =
+        typeof task.metadata?.duration === "number"
+          ? task.metadata.duration
+          : undefined;
       const response = await this.videoClient.generateVideo(
         task.id,
-        task?.imageUrls || [],
-        prompt
+        imageUrls,
+        prompt,
+        duration
       );
       // Polling of status and wait
       let videoUrl = "";

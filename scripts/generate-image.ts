@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // Configuration
 const CONFIG = {
-  serverUrl: process.env.SERVER_URL || "http://localhost:8000",
+  serverUrl: process.env.SERVER_URL || "http://localhost:8003",
   pollingInterval: 5000, // 5 seconds
   maxRetries: 60, // 5 minutes maximum waiting time
 };

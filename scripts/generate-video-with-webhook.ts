@@ -1,18 +1,19 @@
 /**
- * Script to generate a video using the Nevermined agent with webhook notifications
- * Instead of SSE, it registers a webhook and receives notifications via HTTP POST
- * @todo Remove the express server after testing
+ * Script to generate a video using the Nevermined agent with webhook notifications (A2A JSON-RPC 2.0)
+ * Hace una única petición POST a /tasks/sendSubscribe con notification.mode: 'webhook' y notification.url.
  */
 
-import axios, { AxiosError } from "axios";
 import { v4 as uuidv4 } from "uuid";
 import express from "express";
 import bodyParser from "body-parser";
 import { AddressInfo } from "net";
+import http from "http";
+import https from "https";
+import { URL } from "url";
 
 // Configuration
 const CONFIG = {
-  serverUrl: process.env.SERVER_URL || "http://localhost:8000",
+  serverUrl: process.env.SERVER_URL || "http://localhost:8003",
   webhookPort: 4002,
   webhookPath: "/webhook-test-client-video",
   eventTypes: ["status_update", "completion"],
@@ -27,7 +28,6 @@ async function startWebhookServer(): Promise<string> {
     const app = express();
     app.use(bodyParser.json());
 
-    //TODO: remove after testing
     app.post(CONFIG.webhookPath, (req, res) => {
       console.log(
         "[Webhook Client] Notification received:",
@@ -36,7 +36,7 @@ async function startWebhookServer(): Promise<string> {
       // Buscar artifacts en todas las ubicaciones posibles
       const artifacts =
         req.body.artifacts ||
-        (req.body.data && req.body.data["finalStatus"]?.artifacts) ||
+        req.body.data?.finalStatus?.artifacts ||
         req.body.data?.status?.artifacts;
       if (artifacts) {
         const videoArtifact = artifacts.find((artifact: any) =>
@@ -103,121 +103,118 @@ async function startWebhookServer(): Promise<string> {
 }
 
 /**
- * Creates a new video generation task
+ * Creates a new video generation task and registers webhook in a single call
  * @param {Object} params Video generation parameters
- * @returns {Promise<string>} Task ID
- */
-async function createVideoTask(params: {
-  prompt: string;
-  duration?: number;
-  imageUrls?: string[];
-}): Promise<string> {
-  try {
-    const requestId = uuidv4();
-    const taskRequest = {
-      jsonrpc: "2.0",
-      id: requestId,
-      method: "tasks/sendSubscribe",
-      params: {
-        message: {
-          role: "user",
-          parts: [{ type: "text", text: params.prompt }],
-        },
-        sessionId: uuidv4(),
-        taskType: "text2video",
-        duration: params.duration,
-        imageUrls: params.imageUrls,
-      },
-    };
-    console.log("Sending video task request (A2A JSON-RPC 2.0):", taskRequest);
-    const response = await axios.post(
-      `${CONFIG.serverUrl}/tasks/sendSubscribe`,
-      taskRequest
-    );
-    console.log("Server response:", response.data);
-    return response.data.result.id;
-  } catch (error) {
-    if (error instanceof AxiosError) {
-      console.error("API Response:", error.response?.data);
-      throw new Error(
-        `Failed to create video generation task: ${error.message}`
-      );
-    }
-    throw new Error("Failed to create video generation task: Unknown error");
-  }
-}
-
-/**
- * Registers a webhook for receiving notifications for a task
- * @param {string} taskId The task ID
+ * @param {string} params.prompt The prompt for the video
+ * @param {number} [params.duration] Optional duration
+ * @param {string[]} [params.imageUrls] Optional reference images
  * @param {string} webhookUrl The webhook URL
  * @returns {Promise<void>}
  */
-async function registerWebhook(
-  taskId: string,
+async function generateVideoWithWebhook(
+  params: {
+    prompt: string;
+    duration?: number;
+    imageUrls?: string[];
+  },
   webhookUrl: string
 ): Promise<void> {
-  try {
-    const config = {
-      taskId,
-      eventTypes: CONFIG.eventTypes,
-      webhookUrl,
-    };
-    console.log("Registering webhook:", config);
-    const response = await axios.post(
-      `${CONFIG.serverUrl}/tasks/${taskId}/notifications`,
-      config
-    );
-    console.log("Webhook registration response:", response.data);
-  } catch (error) {
-    if (error instanceof AxiosError) {
-      console.error("Webhook registration error:", error.response?.data);
-      throw new Error(`Failed to register webhook: ${error.message}`);
-    }
-    throw new Error("Failed to register webhook: Unknown error");
-  }
-}
+  // Build the message according to A2A
+  const message = {
+    role: "user",
+    parts: [{ type: "text", text: params.prompt }],
+  };
+  const metadata: Record<string, any> = {};
+  if (params.imageUrls) metadata.imageUrls = params.imageUrls;
+  if (params.duration) metadata.duration = params.duration;
 
-/**
- * Main function to generate a video and receive webhook notifications
- * @param {Object} videoParams Parameters for video generation
- * @returns {Promise<void>}
- */
-async function generateVideoWithWebhook(videoParams: {
-  prompt: string;
-  duration?: number;
-  imageUrls?: string[];
-}): Promise<void> {
-  // Start webhook server
-  const webhookUrl = await startWebhookServer();
+  // JSON-RPC 2.0 request body with webhook notification
+  const jsonRpcRequest = {
+    jsonrpc: "2.0",
+    id: uuidv4(),
+    method: "tasks/sendSubscribe",
+    params: {
+      sessionId: uuidv4(),
+      message,
+      metadata,
+      taskType: "text2video",
+      notification: {
+        mode: "webhook",
+        url: webhookUrl,
+        eventTypes: CONFIG.eventTypes,
+      },
+    },
+  };
 
-  // Create task
-  const taskId = await createVideoTask(videoParams);
-  console.log(`Task created with ID: ${taskId}`);
+  // Prepare HTTP(S) request options
+  const url = new URL("/tasks/sendSubscribe", CONFIG.serverUrl);
+  const isHttps = url.protocol === "https:";
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  };
 
-  // Register webhook
-  await registerWebhook(taskId, webhookUrl);
+  // Choose http or https module
+  const client = isHttps ? https : http;
 
-  console.log("Waiting for webhook notifications... (press Ctrl+C to exit)");
+  // Make the POST request
+  await new Promise<void>((resolve, reject) => {
+    const req = client.request(url, options, (res) => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        data += chunk;
+      });
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
+          console.log("[Webhook Client] Task creation response:", parsed);
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      });
+      res.on("error", (err) => {
+        reject(err);
+      });
+    });
+    req.on("error", (err) => {
+      reject(err);
+    });
+    req.write(JSON.stringify(jsonRpcRequest));
+    req.end();
+  });
 }
 
 // Run the script if called directly
 if (require.main === module) {
   const prompt =
     process.argv[2] || "A timelapse of a city skyline, cinematic, 5 seconds";
-  generateVideoWithWebhook({
-    prompt,
-    duration: 5,
-    imageUrls: [
-      "https://v3.fal.media/files/zebra/vKRttnrYOu5FuljgFxC7-.png",
-      "https://v3.fal.media/files/monkey/mKJ72b67ckayIuX7Ql1pQ.png",
-    ],
-  })
-    .then(() => {})
-    .catch((error) => {
-      console.error("Script failed:", error);
-      process.exit(1);
-    });
+  startWebhookServer().then((webhookUrl) =>
+    generateVideoWithWebhook(
+      {
+        prompt,
+        duration: 5,
+        imageUrls: [
+          "https://v3.fal.media/files/zebra/vKRttnrYOu5FuljgFxC7-.png",
+          "https://v3.fal.media/files/monkey/mKJ72b67ckayIuX7Ql1pQ.png",
+        ],
+      },
+      webhookUrl
+    )
+      .then(() => {
+        console.log(
+          "Waiting for webhook notifications... (press Ctrl+C to exit)"
+        );
+      })
+      .catch((error) => {
+        console.error("Script failed:", error);
+        process.exit(1);
+      })
+  );
 }
 
 export { generateVideoWithWebhook };
