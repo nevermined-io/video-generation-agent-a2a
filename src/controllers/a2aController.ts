@@ -403,19 +403,11 @@ export class A2AController {
     message: Message;
     metadata?: Record<string, any>;
     acceptedOutputModes?: string[];
-    taskType?: string;
     [key: string]: any;
   }): Promise<Task> {
     try {
-      const {
-        id,
-        sessionId,
-        message,
-        metadata,
-        acceptedOutputModes,
-        taskType,
-        ...rest
-      } = params;
+      const { id, sessionId, message, metadata, acceptedOutputModes, ...rest } =
+        params;
       const task: Task = {
         id: id || crypto.randomUUID(),
         sessionId,
@@ -426,7 +418,7 @@ export class A2AController {
         message,
         metadata,
         acceptedOutputModes,
-        taskType,
+        taskType: metadata?.taskType,
         ...rest,
       };
 
@@ -561,7 +553,6 @@ export class A2AController {
         metadata,
         sessionId,
         acceptedOutputModes,
-        taskType,
         notification,
         ...rest
       } = params;
@@ -582,6 +573,18 @@ export class A2AController {
         });
         return;
       }
+
+      if (!metadata?.taskType) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32602,
+            message: "Task type is required (text2image, text2video, etc.)",
+          },
+        });
+        return;
+      }
       // 1. Create the task
       const task = await this.createTask({
         id: params.id, // Puede venir del cliente
@@ -589,7 +592,6 @@ export class A2AController {
         message,
         metadata,
         acceptedOutputModes,
-        taskType,
         ...rest,
       });
       const taskId = task.id;

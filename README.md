@@ -113,10 +113,12 @@ Rename `.env.example` to `.env` and set the required keys:
 # Example
 FAL_API_KEY=your_fal_key
 PIAPI_KEY=your_piapi_key
+DEMO_MODE=true
 ```
 
 * `FAL_API_KEY`: Access to Fal.ai for image/video generation (if used).
 * `PIAPI_KEY`: Access to TTapi for video generation (if used).
+* `DEMO_MODE`: Set to `true` to use the demo video client that simulates API responses without making external API calls (default: `false`).
 
 ---
 

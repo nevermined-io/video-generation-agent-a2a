@@ -34,6 +34,7 @@ export function validateEnv(): EnvConfig {
     LOG_LEVEL: process.env.LOG_LEVEL || defaultConfig.LOG_LEVEL!,
     FAL_KEY: process.env.FAL_KEY!,
     PIAPI_KEY: process.env.PIAPI_KEY!,
+    DEMO_MODE: process.env.DEMO_MODE === "true",
     MAX_CONCURRENT_TASKS: parseInt(
       process.env.MAX_CONCURRENT_TASKS ||
         defaultConfig.MAX_CONCURRENT_TASKS!.toString(),

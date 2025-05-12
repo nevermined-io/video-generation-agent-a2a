@@ -1,0 +1,115 @@
+[
+  {
+    "name": "Image & Video Generation Agent",
+    "description": "AI agent that generates images and videos from text prompts, using advanced AI models. Supports real-time updates (streaming) and push notifications.",
+    "url": "http://localhost:8003",
+    "provider": {
+      "organization": "Nevermined",
+      "url": "https://nevermined.io"
+    },
+    "version": "2.0.0",
+    "documentationUrl": "https://docs.nevermined.io/agents/image-video-generation",
+    "capabilities": {
+      "streaming": true,
+      "pushNotifications": true,
+      "stateTransitionHistory": true
+    },
+    "defaultInputModes": ["text/plain", "application/json"],
+    "defaultOutputModes": [
+      "application/json",
+      "image/png",
+      "video/mp4",
+      "text/plain"
+    ],
+    "notificationEvents": [
+      {
+        "type": "status_update",
+        "description": "Task status update. Includes { status: TaskStatus, artifacts: TaskArtifact[] }"
+      },
+      {
+        "type": "completion",
+        "description": "Task completed/cancelled/failed. Includes { finalStatus: TaskStatus, artifacts: TaskArtifact[] }"
+      },
+      {
+        "type": "artifact_created",
+        "description": "(Planned) New artifact created. Includes { artifact: TaskArtifact }"
+      },
+      {
+        "type": "error",
+        "description": "Error event. Includes { error: string }"
+      }
+    ],
+    "skills": [
+      {
+        "id": "image-generation",
+        "name": "Image Generation",
+        "description": "Generates an image from a text prompt.",
+        "tags": ["image", "generation", "ai"],
+        "inputModes": ["text/plain", "application/json"],
+        "outputModes": ["image/png", "application/json"],
+        "parameters": [
+          {
+            "name": "taskType",
+            "description": "Type of image generation task. Must be 'text2image' (required)",
+            "required": true,
+            "type": "string",
+            "enum": ["text2image"]
+          },
+          {
+            "name": "prompt",
+            "description": "Text prompt for image generation. When calling the agent, include this as a Message object: { role: 'user', parts: [{ type: 'text', text: <prompt> }] }",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "examples": [
+          {
+            "role": "user",
+            "parts": [{ "type": "text", "text": "A cat riding a bicycle" }]
+          }
+        ]
+      },
+      {
+        "id": "video-generation",
+        "name": "Video Generation",
+        "description": "Generates a video from a text prompt and one or more reference images",
+        "tags": ["video", "generation", "ai"],
+        "inputModes": ["text/plain", "application/json"],
+        "outputModes": ["video/mp4", "application/json"],
+        "parameters": [
+          {
+            "name": "taskType",
+            "description": "Type of video generation task. Must be 'text2video' (required)",
+            "required": true,
+            "type": "string",
+            "enum": ["text2video"]
+          },
+          {
+            "name": "prompt",
+            "description": "Text prompt for video generation. When calling the agent, include this as a Message object: { role: 'user', parts: [{ type: 'text', text: <prompt> }] }",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "imageUrls",
+            "description": "List of reference image URLs",
+            "required": true,
+            "type": "string[]"
+          },
+          {
+            "name": "duration",
+            "description": "Video duration in seconds (5 or 10)",
+            "required": false,
+            "type": "number"
+          }
+        ],
+        "examples": [
+          {
+            "role": "user",
+            "parts": [{ "type": "text", "text": "A dog surfing a wave" }]
+          }
+        ]
+      }
+    ]
+  }
+]

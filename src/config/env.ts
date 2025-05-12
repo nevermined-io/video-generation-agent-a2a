@@ -12,8 +12,7 @@ export const NVM_ENVIRONMENT = process.env.NVM_ENVIRONMENT || "testing";
 export const AGENT_DID = process.env.AGENT_DID!;
 export const SUNO_API_KEY = process.env.SUNO_API_KEY!;
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
-export const IS_DUMMY = process.env.IS_DUMMY === "true";
-export const DUMMY_JOB_ID = process.env.DUMMY_JOB_ID!;
+export const DEMO_MODE = process.env.DEMO_MODE === "true";
 
 export interface EnvConfig {
   PORT: number;
@@ -28,6 +27,7 @@ export interface EnvConfig {
   MAX_RETRIES: number;
   RETRY_DELAY: number;
   TASK_TIMEOUT: number;
+  DEMO_MODE: boolean;
 }
 
 /**
@@ -45,10 +45,15 @@ export const defaultConfig: Partial<EnvConfig> = {
   TASK_TIMEOUT: 300000, // 5 minutes
   FAL_KEY: "",
   PIAPI_KEY: "",
+  DEMO_MODE: false,
 };
 
 /**
  * @constant requiredEnvVars
  * @description List of required environment variables
  */
-export const requiredEnvVars: (keyof EnvConfig)[] = ["FAL_KEY", "PIAPI_KEY"];
+export const requiredEnvVars: (keyof EnvConfig)[] = [
+  "FAL_KEY",
+  "PIAPI_KEY",
+  "DEMO_MODE",
+];

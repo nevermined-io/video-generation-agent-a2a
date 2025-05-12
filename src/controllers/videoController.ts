@@ -11,7 +11,7 @@ import {
   TaskStatus,
   Task,
 } from "../interfaces/a2a";
-import { VideoClient } from "../clients/videoClient";
+import { getVideoClient } from "../services/videoClientService";
 import { Logger } from "../utils/logger";
 
 /**
@@ -19,7 +19,7 @@ import { Logger } from "../utils/logger";
  * @description Controls the video generation process following A2A protocol
  */
 export class VideoGenerationController {
-  private readonly videoClient: VideoClient;
+  private readonly videoClient: ReturnType<typeof getVideoClient>;
 
   /**
    * @constructor
@@ -29,7 +29,7 @@ export class VideoGenerationController {
     if (!apiKey) {
       throw new Error("PiAPI API key is required");
     }
-    this.videoClient = new VideoClient({ apiKey });
+    this.videoClient = getVideoClient({ apiKey });
   }
 
   /**
