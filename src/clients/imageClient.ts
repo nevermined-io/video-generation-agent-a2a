@@ -59,16 +59,13 @@ export class ImageClient {
 
   /**
    * @method generateImage
-   * @description Initiates the generation of a new image from a text prompt
+   * @description Generates an image from a text prompt and returns the result directly
    * @param {string} taskId - Our internal task ID
    * @param {string} prompt - The text prompt for image generation
-   * @returns {Promise<GenerateImageResponse>} Response containing the task ID and initial status
+   * @returns {Promise<ImageResponse>} Response containing the image URL and metadata
    * @throws {MediaError} If the API request fails
    */
-  async generateImage(
-    taskId: string,
-    prompt: string
-  ): Promise<GenerateImageResponse> {
+  async generateImage(taskId: string, prompt: string): Promise<ImageResponse> {
     if (!prompt) {
       throw new MediaError(
         MediaErrorCode.INVALID_REQUEST,
@@ -89,19 +86,32 @@ export class ImageClient {
           enable_safety_checker: true,
         },
         logs: true,
+        onQueueUpdate: (update) => {
+          if (update.status === "COMPLETED") {
+            Logger.debug(
+              `Image generation completed for taskId ${taskId} with jobId ${update.request_id}`
+            );
+          }
+        },
       });
-      if (!result?.requestId) {
+      // Fal.ai's subscribe result type does not expose 'images', but the real response includes it
+      const resultAny = result as any;
+      if (!resultAny?.data?.images?.[0]?.url) {
         throw new MediaError(
           MediaErrorCode.API_ERROR,
           500,
-          "No requestId received from Fal.ai."
+          "No image received from Fal.ai."
         );
       }
-      this.jobIdMap.set(taskId, result.requestId);
       return {
-        id: taskId,
-        status: "submitted",
-        estimatedTime: 10,
+        jobId: resultAny.requestId || taskId,
+        image: {
+          imageId: resultAny.requestId || taskId,
+          url: resultAny.data.images[0].url,
+        },
+        metadata: {
+          prompt: prompt,
+        },
       };
     } catch (error) {
       if (error instanceof MediaError) {

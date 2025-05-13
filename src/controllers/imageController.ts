@@ -161,34 +161,8 @@ export class ImageGenerationController {
       yield genUpdate;
       // Start generation
       const response = await this.imageClient.generateImage(task.id, prompt);
-      // Polling of status and wait
-      let imageUrl = "";
-      for await (const status of this.imageClient.waitForCompletion(task.id)) {
-        if (isCancelled()) {
-          const cancelUpdate: TaskYieldUpdate = {
-            state: TaskState.CANCELLED,
-            message: {
-              role: "agent",
-              parts: [{ type: "text", text: "Task cancelled by user" }],
-            },
-          };
-          this.updateTaskHistory(task, cancelUpdate);
-          yield cancelUpdate;
-          return;
-        }
-        if (status.status === "completed") {
-          imageUrl = (await this.imageClient.getImage(task.id)).image.url;
-          break;
-        }
-        // Emit progress
-        const progressUpdate = this.createTextMessage(
-          `Image generation progress: ${status.progress}%`
-        );
-        this.updateTaskHistory(task, progressUpdate);
-        yield progressUpdate;
-      }
-      // Final artifact
-      const artifact: TaskArtifact = this.createArtifact(imageUrl);
+      // Emit final artifact directly
+      const artifact: TaskArtifact = this.createArtifact(response.image.url);
       const finalUpdate: TaskYieldUpdate = {
         state: TaskState.COMPLETED,
         message: {

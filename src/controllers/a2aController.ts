@@ -307,7 +307,7 @@ export class A2AController {
         return;
       }
       const task = await this.createTask({
-        id: params.id, // Puede venir del cliente
+        id: params.id,
         sessionId,
         message,
         metadata,
