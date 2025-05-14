@@ -143,6 +143,18 @@ export class PushNotificationService {
       if (config.webhookUrl) {
         this.sendWebhookNotification(config.webhookUrl, event);
       }
+      // Unsubscribe all SSE clients if event is ERROR or COMPLETION
+      if (
+        event.type === PushNotificationEventType.ERROR ||
+        event.type === PushNotificationEventType.COMPLETION
+      ) {
+        if (connections) {
+          // Create a copy to avoid modifying the set while iterating
+          Array.from(connections).forEach((res) => {
+            this.unsubscribe(taskId, res);
+          });
+        }
+      }
     }
   }
 

@@ -14,7 +14,6 @@ import { Logger } from "../utils/logger";
 import { PushNotificationService } from "../services/pushNotificationService";
 import { StreamingService } from "../services/streamingService";
 import {
-  PushNotificationConfig,
   PushNotificationEvent,
   PushNotificationEventType,
 } from "../interfaces/a2a";

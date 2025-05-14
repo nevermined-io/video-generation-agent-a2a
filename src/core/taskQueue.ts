@@ -42,7 +42,7 @@ export class TaskQueue {
   constructor(
     private taskProcessor: TaskProcessor,
     private config: QueueConfig = {
-      maxConcurrent: 1,
+      maxConcurrent: 5,
       maxRetries: 3,
       retryDelay: 1000,
     }

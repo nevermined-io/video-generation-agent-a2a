@@ -108,7 +108,7 @@ export class VideoClient {
       );
     }
     if (![5, 10].includes(duration)) {
-      duration = 10;
+      duration = 5;
     }
     const payload = {
       model: "kling",
@@ -224,7 +224,7 @@ export class VideoClient {
     taskId: string,
     options: WaitForCompletionOptions = {}
   ): AsyncGenerator<StatusData, VideoResponse> {
-    const { timeout = 300000, interval = 5000, onStatusUpdate } = options;
+    const { timeout = 1200000, interval = 5000, onStatusUpdate } = options;
     const startTime = Date.now();
     const jobId = this.getJobId(taskId);
     Logger.debug(

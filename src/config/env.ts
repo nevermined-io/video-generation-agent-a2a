@@ -39,7 +39,7 @@ export const defaultConfig: Partial<EnvConfig> = {
   HOST: "localhost",
   NODE_ENV: "development",
   LOG_LEVEL: "info",
-  MAX_CONCURRENT_TASKS: 1,
+  MAX_CONCURRENT_TASKS: 10,
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000,
   TASK_TIMEOUT: 300000, // 5 minutes

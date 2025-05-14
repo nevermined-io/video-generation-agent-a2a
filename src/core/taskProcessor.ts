@@ -14,6 +14,11 @@ import { TaskStore } from "./taskStore";
 import { Logger } from "../utils/logger";
 import { ImageGenerationController } from "../controllers/imageController";
 import { VideoGenerationController } from "../controllers/videoController";
+import { PushNotificationService } from "../services/pushNotificationService";
+import {
+  PushNotificationEvent,
+  PushNotificationEventType,
+} from "../interfaces/a2a";
 
 /**
  * @class TaskProcessor
@@ -21,6 +26,7 @@ import { VideoGenerationController } from "../controllers/videoController";
  */
 export class TaskProcessor {
   private isCancelled: boolean = false;
+  private pushNotificationService: PushNotificationService;
 
   /**
    * @constructor
@@ -32,7 +38,9 @@ export class TaskProcessor {
     private taskStore: TaskStore,
     private imageController: ImageGenerationController,
     private videoController: VideoGenerationController
-  ) {}
+  ) {
+    this.pushNotificationService = new PushNotificationService();
+  }
 
   /**
    * @method processTask
@@ -127,7 +135,7 @@ export class TaskProcessor {
 
   /**
    * @method updateTaskStatus
-   * @description Update task status and persist changes
+   * @description Update task status, persist changes, and notify subscribers if state or progress changes
    */
   private async updateTaskStatus(
     task: Task,
@@ -143,8 +151,31 @@ export class TaskProcessor {
         throw new Error(`Task ${task.id} not found`);
       }
 
-      // If the state doesn't change, don't update or notify
-      if (currentTask.status?.state === state) {
+      // Only update and notify if state or progress text changes
+      const lastStatus = currentTask.status;
+      const lastHistory = currentTask.history || [];
+      const lastProgress =
+        lastHistory.length > 0
+          ? lastHistory[lastHistory.length - 1]
+          : undefined;
+      const isStateChanged = lastStatus?.state !== state;
+      let isProgressChanged = false;
+      if (
+        message &&
+        lastProgress &&
+        message.parts &&
+        lastProgress.message &&
+        lastProgress.message.parts
+      ) {
+        // Compare progress text if present
+        const lastText = lastProgress.message.parts.find(
+          (p: any) => p.type === "text"
+        )?.text;
+        const newText = message.parts.find((p: any) => p.type === "text")?.text;
+        isProgressChanged = lastText !== newText;
+      }
+
+      if (!isStateChanged && !isProgressChanged) {
         return;
       }
 
@@ -163,6 +194,18 @@ export class TaskProcessor {
 
       await this.taskStore.updateTask(updatedTask);
       Logger.info(`Updated task ${task.id} status to ${state}`);
+
+      // Notify subscribers if there is a relevant change
+      const event: PushNotificationEvent = {
+        type: PushNotificationEventType.STATUS_UPDATE,
+        taskId: task.id,
+        timestamp,
+        data: {
+          status: statusUpdate,
+          artifacts: artifacts,
+        },
+      };
+      this.pushNotificationService.notify(task.id, event);
     } catch (error) {
       Logger.error(
         `Error updating task status: ${
