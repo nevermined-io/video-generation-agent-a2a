@@ -45,7 +45,7 @@ export class VideoClient {
     }
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl || "https://demo-api.example.com/api/v1";
-    this.defaultTimeout = config.timeout || 15000; // 15 segundos por defecto
+    this.defaultTimeout = config.timeout || 120000; // 120 seconds by default
   }
 
   /**

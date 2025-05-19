@@ -183,13 +183,13 @@ export class TaskProcessor {
         state,
         timestamp,
         message,
-        artifacts,
       };
 
       const updatedTask = {
         ...currentTask,
         status: statusUpdate,
         history: [...(currentTask.history || []), statusUpdate],
+        ...(artifacts ? { artifacts } : {}),
       };
 
       await this.taskStore.updateTask(updatedTask);
