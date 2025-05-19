@@ -280,14 +280,8 @@ export class A2AController {
         });
         return;
       }
-      const {
-        message,
-        metadata,
-        sessionId,
-        acceptedOutputModes,
-        taskType,
-        ...rest
-      } = params;
+      const { message, metadata, sessionId, acceptedOutputModes, ...rest } =
+        params;
       if (
         !message ||
         !message.parts ||
@@ -311,7 +305,6 @@ export class A2AController {
         message,
         metadata,
         acceptedOutputModes,
-        taskType,
         ...rest,
       });
       res.json({

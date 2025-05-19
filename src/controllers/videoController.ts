@@ -130,7 +130,7 @@ export class VideoGenerationController {
    * @async
    * @generator
    * @function handleTask
-   * @description Handles a video generation task according to A2A protocol
+   * @description Handles a video generation task according to A2A protocol (active polling)
    * @param {TaskContext} context - Task context from A2A
    * @yields {TaskYieldUpdate} Status updates and artifacts
    */
@@ -153,12 +153,6 @@ export class VideoGenerationController {
       this.updateTaskHistory(task, initialUpdate);
       yield initialUpdate;
       // Launch generation
-      const genUpdate = this.createTextMessage(
-        "Generating video, please wait..."
-      );
-      this.updateTaskHistory(task, genUpdate);
-      yield genUpdate;
-      // Start generation
       const imageUrls = Array.isArray(task.metadata?.imageUrls)
         ? task.metadata.imageUrls
         : [];
@@ -166,52 +160,74 @@ export class VideoGenerationController {
         typeof task.metadata?.duration === "number"
           ? task.metadata.duration
           : undefined;
-      const response = await this.videoClient.generateVideo(
+      await this.videoClient.generateVideo(
         task.id,
         imageUrls,
         prompt,
         duration
       );
       // Polling of status and wait
-      let videoUrl = "";
-      for await (const status of this.videoClient.waitForCompletion(task.id)) {
-        if (isCancelled()) {
-          const cancelUpdate: TaskYieldUpdate = {
-            state: TaskState.CANCELLED,
-            message: {
-              role: "agent",
-              parts: [{ type: "text", text: "Task cancelled by user" }],
-            },
-          };
-          this.updateTaskHistory(task, cancelUpdate);
-          yield cancelUpdate;
-          return;
+      let lastProgress = 0;
+      try {
+        for await (const status of this.videoClient.waitForCompletion(task.id, {
+          interval: 5000,
+        })) {
+          if (isCancelled()) {
+            const cancelUpdate: TaskYieldUpdate = {
+              state: TaskState.CANCELLED,
+              message: {
+                role: "agent",
+                parts: [{ type: "text", text: "Task cancelled by user" }],
+              },
+            };
+            this.updateTaskHistory(task, cancelUpdate);
+            yield cancelUpdate;
+            return;
+          }
+          if (status.progress > lastProgress) {
+            lastProgress = status.progress;
+            const progressUpdate = this.createTextMessage(
+              `Video generation progress: ${status.progress}%`
+            );
+            this.updateTaskHistory(task, progressUpdate);
+            yield progressUpdate;
+          }
         }
-        if (status.status === "completed") {
-          videoUrl = (await this.videoClient.getVideo(task.id)).video.url;
-          break;
-        }
-        // Emit progress
-        const progressUpdate = this.createTextMessage(
-          `Video generation progress: ${status.progress}%`
-        );
-        this.updateTaskHistory(task, progressUpdate);
-        yield progressUpdate;
+        // Get the final video data
+        const videoData = await this.videoClient.getVideo(task.id);
+        const artifact: TaskArtifact = this.createArtifact(videoData.video.url);
+        const finalUpdate: TaskYieldUpdate = {
+          state: TaskState.COMPLETED,
+          message: {
+            role: "agent",
+            parts: [
+              {
+                type: "text",
+                text: "Video generation completed successfully.",
+              },
+            ],
+          },
+          artifacts: [artifact],
+        };
+        this.updateTaskHistory(task, finalUpdate);
+        yield finalUpdate;
+      } catch (error) {
+        Logger.error(`VideoGenerationController error: ${error}`);
+        const failUpdate: TaskYieldUpdate = {
+          state: TaskState.FAILED,
+          message: {
+            role: "agent",
+            parts: [
+              {
+                type: "text",
+                text: `Video generation failed: ${error}`,
+              },
+            ],
+          },
+        };
+        this.updateTaskHistory(task, failUpdate);
+        yield failUpdate;
       }
-      // Final artifact
-      const artifact: TaskArtifact = this.createArtifact(videoUrl);
-      const finalUpdate: TaskYieldUpdate = {
-        state: TaskState.COMPLETED,
-        message: {
-          role: "agent",
-          parts: [
-            { type: "text", text: "Video generation completed successfully." },
-          ],
-        },
-        artifacts: [artifact],
-      };
-      this.updateTaskHistory(task, finalUpdate);
-      yield finalUpdate;
     } catch (error) {
       Logger.error(`VideoGenerationController error: ${error}`);
       const failUpdate: TaskYieldUpdate = {
